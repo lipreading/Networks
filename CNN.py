@@ -32,8 +32,8 @@ class Net(nn.Module):
         self.conv4 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3,3))
         self.conv5 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3,3))
         self.fc6 = nn.Linear(512, 4096) # почему в fc-6 vgg-m 6*6?
-        self.fc7 = nn.Linear(4096, 4096) # почему в fc-6 vgg-m 6*6?
-        self.fc8 = nn.Linear(4096, 500) # почему в fc-6 vgg-m 6*6?
+        self.fc7 = nn.Linear(4096, 4096) 
+        self.fc8 = nn.Linear(4096, 500)
             
     def forward(self, x):
         print(x.shape)
@@ -59,12 +59,11 @@ class Net(nn.Module):
         
         # fc 
         x= x.view(512)
-        x = self.fc6(x) #скорее всего он неправильный.
-        x = self.fc7(x)
-        x = self.fc8(x)
-                
-        return x # получиили вектор из 500 слов; то, что ожидали
-        
+        x = F.relu(self.fc6(x)) #скорее всего он неправильный.
+        x = F.relu(self.fc7(x))
+        x = self.fc8(x) 
+        # получиили вектор из 500 слов; то, что ожидали
+        return  F.softmax(x, dim=0)
 
 net = Net()
 print(net)
@@ -73,3 +72,4 @@ print(net)
 input = Variable(torch.randn(25,1, 112, 112))
 out = net(input)
 print(out.shape) 
+print(out.sum()) #1 , потому что это распределение
