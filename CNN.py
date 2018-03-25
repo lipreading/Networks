@@ -55,6 +55,7 @@ class Net(nn.Module):
         print(x.shape)
        
         x = F.max_pool2d(F.relu(self.conv5(x)), (3, 3))
+        
         print(x.shape)
         
         # fc 
