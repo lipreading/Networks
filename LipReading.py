@@ -87,7 +87,7 @@ class EncoderRNN(nn.Module):
          
          #6
          x=x.view(32768)
-         x = F.relu(self.fc6(x)) 
+         x = self.fc6(x)                  #     должна ли быть функция актвации для последнего слоя?
          
          
          return  x
@@ -105,7 +105,13 @@ class DecoderRNN(nn.Module):
         self.lstm1=nn.LSTM(36,self.hidden_size) #кол-во букв в русском алфавите = 33 и еще + 3.
         self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
         self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)
-                
+        
+            
+
+        #MLP
+        self.MLP_hidden_size = 256
+        self.fc1 = nn.Linear(256,self.MLP_hidden_size)        
+        self.fc2=nn.Linear(self.MLP_hidden_size,36)
     def forward(self,Y,hidden1,hidden2,hidden3):
         
         output,hidden1=self.lstm1(Y,hidden1)
@@ -116,13 +122,27 @@ class DecoderRNN(nn.Module):
         print(hidden3[0].shape)
         print(hidden3[1].shape)
         
-        h=hidden3[0]
-        c=hidden3[1]
-                
-        #return output
-
-
-
+#        h=hidden3[0]
+        C=hidden3[1]
+#   осталось написать atention и MLP       
+        Y = output # while atention skip
+        
+    
+#MLP три fc слоя?
+        Y = F.relu(self.fc1(Y))    
+        Y = self.fc2(Y)    
+        return F.log_softmax(Y,dim=1),C,hidden1,hidden2,hidden3  #         разобраться с softmax!
+        
+    
+#    def attention(C,outsEncoder):# вообще бред скорее всего
+#        attn_W = torch.randn(256,256)# временно какая вообще размерность у нее должна быть?
+#        attn_V = torch.randn(outsEncoder.shape[0],outsEncoder.shape[1])
+#        b=torch.randn(256)
+#        att = F.tanh(torch.bmm(attn_W,С)+torch.bmm(attn_V,outsEncoder)+b)
+#        
+      
+        
+    
 encoder = EncoderRNN()
 #print(encoder)
 
@@ -136,13 +156,18 @@ print(out.shape)
 print(hidden1[0].shape)
 print(hidden1[1].shape)
 #тут будет цикл и все такое, каждый out пойдет в attention. а последние hidden - это вектора состояний
-#....
+#...
+
+
+
+
+
 
 print("FINISH ENCODER")
 #
 Y=Variable(torch.torch.randn(1,1,36))
 # decoder
 decoder= DecoderRNN()
-decoder(Y,hidden1,hidden2,hidden3)
+Y,C,hidden1,hidden2,hidden3 = decoder(Y,hidden1,hidden2,hidden3)
 
 #%% 
