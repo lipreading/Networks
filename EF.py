@@ -109,7 +109,7 @@ def train(epoch, train_data, target_data):
 # train_data = data_load()
 train_data = torch.randn(1, 5, 120, 120)
 target_data = torch.IntTensor(512).zero_()
-target_data[0] = 5
+target_data[0] = 1
 
 # input = Variable(torch.randn(1, 5, 120, 120))
 # out = net(input)
