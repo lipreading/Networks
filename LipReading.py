@@ -32,57 +32,78 @@ class EncoderRNN(nn.Module):
         
         # LSTM
         self.lstm1=nn.LSTM(512,self.hidden_size)
-        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
-        self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)
+#        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
+#        self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)       
+  
+    def forward(self,input):
+#        output = self.CNN(input)            
+        CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_()) # то есть первый параметр это seq_len; второй выход CNN
         
-    def forward(self,input,hidden1,hidden2,hidden3):
-        output = self.CNN(input)            
-        
-        output=output.view(1,1,512)
-        output,hidden1=self.lstm1(output,hidden1)
-        output,hidden2=self.lstm2(output,hidden2)
-        output,hidden3=self.lstm3(output,hidden3)
-        
-        return output,hidden1,hidden2,hidden3
-        
+        for i in range(input.shape[0]):   #кидаем по одному в CNN
+            CNN_in = torch.unsqueeze(input[i],0) # то есть размерность 1*5*120*120
+            CNN_out[i] = self.CNN(CNN_in)
+                
+        print(CNN_out.shape)    # seq_len*512
+        return self.RNN(CNN_out)
+#        out = self.CNN(input)
+#        print("finish CNN:", out.shape)
+        #            CNN_out[i]=out
+            
+#        output=output.view(1,1,512)
+#        output,hidden1=self.lstm1(output,hidden1)
+#        print("output")
+#        print(output.shape)
+#        output,hidden2=self.lstm2(output,hidden2)
+#        output,hidden3=self.lstm3(output,hidden3)
+#        
+#        return output,hidden
+#        
+    def RNN(self,input): #input.shape= seq_len*512
+        hidden = self.initHidden()
+        input = torch.unsqueeze(input,1)
+        #print(input.shape)
+        output,hidden=self.lstm1(input,hidden)
+        print("outRNN",output.shape)
+        print("hiddenRNN",hidden[0].shape)
+        return output,hidden[0]
     def initHidden(self):
         return (torch.autograd.Variable(torch.randn(1, 1, self.hidden_size)),
          torch.autograd.Variable(torch.randn((1, 1, self.hidden_size))))
             
     def CNN(self, x):
          #1   
-         print(x.shape)
+        # print(x.shape)
          x = F.relu(self.conv1(x))
-         print(x.shape)
+        # print(x.shape)
          x = F.max_pool2d(x, kernel_size=(3,3),stride=2,padding=1)
-         print(x.shape)
+        # print(x.shape)
          #print("mean=",x.mean())        
          x =self.batchNorm1(x)
          #print("mean=",x.mean())
-         print("first layer finish")
+        # print("first layer finish")
          #2
          x = F.relu(self.conv2(x))
-         print(x.shape)
+       #  print(x.shape)
          x = F.max_pool2d(x, kernel_size=(3,3),stride=2, padding=1) 
-         print(x.shape)
+       #  print(x.shape)
          x =self.batchNorm2(x)
          
          
          #3
          x = F.relu(self.conv3(x))
-         print(x.shape)
+        # print(x.shape)
          
          
          #4
          x = F.relu(self.conv4(x))
-         print(x.shape)
+        # print(x.shape)
          
          
          #5
          x = F.relu(self.conv5(x))
-         print(x.shape)
+        # print(x.shape)
          x = F.max_pool2d(x, kernel_size=(3,3),stride=2, padding=1) 
-         print(x.shape)
+        # print(x.shape)
          
          
          #6
@@ -101,73 +122,71 @@ class DecoderRNN(nn.Module):
     def __init__(self):
         super(DecoderRNN, self).__init__()
         # LSTM
+        self.output_encoder_size=10  #потом другая будет
         self.hidden_size=256
         self.lstm1=nn.LSTM(36,self.hidden_size) #кол-во букв в русском алфавите = 33 и еще + 3.
         self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
         self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)
         
-            
-
+        
         #MLP
         self.MLP_hidden_size = 256
         self.fc1 = nn.Linear(256,self.MLP_hidden_size)        
         self.fc2=nn.Linear(self.MLP_hidden_size,36)
-    def forward(self,Y,hidden1,hidden2,hidden3):
+    def forward(self,Y,hidden):
         
-        output,hidden1=self.lstm1(Y,hidden1)
-        output,hidden2=self.lstm2(output,hidden2)
-        output,hidden3=self.lstm3(output,hidden3)
+        output,hidden=self.lstm1(Y,hidden)
         
         print(output.shape)
-        print(hidden3[0].shape)
-        print(hidden3[1].shape)
-        
-#        h=hidden3[0]
-        C=hidden3[1]
+        print(hidden.shape)
+
 #   осталось написать atention и MLP       
         Y = output # while atention skip
         
     
-#MLP три fc слоя?
         Y = F.relu(self.fc1(Y))    
         Y = self.fc2(Y)    
         return F.log_softmax(Y,dim=1),C,hidden1,hidden2,hidden3  #         разобраться с softmax!
         
-    
-#    def attention(C,outsEncoder):# вообще бред скорее всего
-#        attn_W = torch.randn(256,256)# временно какая вообще размерность у нее должна быть?
-#        attn_V = torch.randn(outsEncoder.shape[0],outsEncoder.shape[1])
-#        b=torch.randn(256)
-#        att = F.tanh(torch.bmm(attn_W,С)+torch.bmm(attn_V,outsEncoder)+b)
+#    
+#    def attention(hidden,outsEncoder):# вообще бред скорее всего
+#        #все параметры будут обуучаться
 #        
-      
+#        attn_W = Variable(torch.randn(256,256))# временно какая вообще размерность у нее должна быть?
+#        attn_V = Variable(torch.randn(outsEncoder.shape[0],outsEncoder.shape[1]))
+#        b=torch.randn(256) 
+#        w=torch.randn(256) # тоже вектор весов.
+#        E = torch.zeros(hidden.shape,outsEncoder.shape[0])
+#        for k in range(E.shape[0]):
+#            for i in range(E.shape[1]):
+#                 E[k][i] = F.tanh(torch.bmm(attn_W,hidden)+torch.bmm(attn_V,outsEncoder)+b)
+#                 E[k][i]=torch.bmm(w,E[k][i])    
+#        
+#        for k in range(E.shape[0]):
+#            E[k] = F.softmax(E[k])    
+#        print(E.shape)
+#        return E
         
     
 encoder = EncoderRNN()
 #print(encoder)
 
-
-input = Variable(torch.randn(1,5,120, 120))
-hidden1 = encoder.initHidden()
-hidden2 = encoder.initHidden()
-hidden3 = encoder.initHidden()
-out,hidden1,hidden2,hidden3 = encoder(input,hidden1,hidden2,hidden3)
+seq_len=10
+input = Variable(torch.randn(10,5,120, 120))
+hidden = encoder.initHidden()
+out,hidden = encoder(input)
 print(out.shape)
-print(hidden1[0].shape)
-print(hidden1[1].shape)
-#тут будет цикл и все такое, каждый out пойдет в attention. а последние hidden - это вектора состояний
-#...
-
-
-
-
-
-
-print("FINISH ENCODER")
+#print(hidden[0].shape)
 #
-Y=Variable(torch.torch.randn(1,1,36))
-# decoder
+#
+#
+#
+#
+#
+print("FINISH ENCODER")
+##
+Y_answer=Variable(torch.torch.randn(seq_len,1,36)) # верные Y
 decoder= DecoderRNN()
-Y,C,hidden1,hidden2,hidden3 = decoder(Y,hidden1,hidden2,hidden3)
-
-#%% 
+Y_NN = decoder(Y_answer,hidden) #Y_NN - что выдала NN
+#
+##%% 
