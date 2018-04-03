@@ -19,32 +19,20 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
 
     encoder_hidden = encoder.initHidden()
 
-    frames = Variable(frames)
+    frames = frames.float()
+    targets = targets.float()
+    frames, targets = Variable(frames), Variable(targets)
 
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
 
     input_length = frames.size()[0]
     target_length = targets.size()[0]
-    #
-    # encoder_outputs = Variable(torch.zeros(input_length, encoder.hidden_size))
-    # encoder_outputs = encoder_outputs.cuda() if use_cuda else encoder_outputs
-
-    loss = 0
-
-    # for ei in range(input_length):
-    #     print('Inside ei: ', frames[ei])
-    #     encoder_output, encoder_hidden = encoder(frames[ei], encoder_hidden)
-    #     encoder_outputs[ei] = encoder_output[0][0]
 
     encoder_output, encoder_hidden = encoder(frames)
 
-    decoder_hidden = encoder_hidden
-
-    for di in range(target_length):
-        decoder_input = targets[di]
-        decoder_output, decoder_hidden = decoder(decoder_input, decoder_hidden)
-        loss += criterion(decoder_output, targets[di])  # Тут непонятно, как учитывать <sos>?
+    decoder_output, decoder_hidden = decoder(targets, encoder_hidden)
+    loss = criterion(decoder_output, targets)
 
     loss.backward()
     encoder_optimizer.step()
@@ -72,18 +60,14 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
     for epoch in range(num_epochs + 1):
         for i, (frames, targets) in enumerate(data_loader):
             frames = frames.view(-1, 5, 120, 120)
+            targets = targets.view(-1, 36)
+            print(targets.shape)
             print(frames.shape)
             # print(frames)
             loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
 
             print_loss_total += loss
             plot_loss_total += loss
-
-            # if i % print_every == 0:
-            #     print_loss_avg = print_loss_total / print_every
-            #     print_loss_total = 0
-            #     print('%s (%d %d%%) %.4f' % (timeSince(start, iter / n_iters),
-            #                                  iter, iter / n_iters * 100, print_loss_avg))
 
 
 use_cuda = False
@@ -93,5 +77,7 @@ if cuda.is_available():
 
 # Build the model
 encoder = EncoderRNN()
+encoder.float()
 decoder = DecoderRNN()
+decoder.float()
 train_iters(encoder, decoder, use_cuda)

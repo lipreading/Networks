@@ -9,9 +9,6 @@ import json
 from Networks.config import FRAME_DIR, BATCH_SIZE
 from Networks.alphabet import Alphabet
 
-SOS_token = 0
-EOS_token = 1
-
 
 class LipsDataset(data.Dataset):
     """Lips custom Dataset"""

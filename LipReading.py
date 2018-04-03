@@ -32,7 +32,7 @@ class EncoderRNN(nn.Module):
     def forward(self, input):
         #        output = self.CNN(input)
         CNN_out = Variable(
-            torch.FloatTensor(input.shape[0], 512).zero_())  # то есть первый параметр это seq_len; второй выход CNN
+            torch.DoubleTensor(input.shape[0], 512).zero_())  # то есть первый параметр это seq_len; второй выход CNN
 
         for i in range(input.shape[0]):  # кидаем по одному в CNN
             CNN_in = torch.unsqueeze(input[i], 0)  # то есть размерность 1*5*120*120
@@ -64,8 +64,8 @@ class EncoderRNN(nn.Module):
         return output, hidden
 
     def initHidden(self):
-        return (torch.autograd.Variable(torch.randn(1, 1, self.hidden_size)),
-                torch.autograd.Variable(torch.randn((1, 1, self.hidden_size))))
+        return (torch.autograd.Variable(torch.randn(1, 1, self.hidden_size).float()),
+                torch.autograd.Variable(torch.randn((1, 1, self.hidden_size)).float()))
 
     def CNN(self, x):
         # 1
