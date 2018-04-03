@@ -34,7 +34,8 @@ class EncoderRNN(nn.Module):
         self.lstm1=nn.LSTM(512,self.hidden_size)
 #        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
 #        self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)       
-  
+        
+        
     def forward(self,input):
 #        output = self.CNN(input)            
         CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_()) # то есть первый параметр это seq_len; второй выход CNN
@@ -127,11 +128,11 @@ class DecoderRNN(nn.Module):
         self.lstm1=nn.LSTM(36,self.hidden_size) #кол-во букв в русском алфавите = 33 и еще + 3.
 #        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
 #        self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)
-        
-        
-        #attention
-        
-        
+
+#        attention
+        self.att_fc1=nn.Linear(self.hidden_size,self.hidden_size)
+        self.att_fc2=nn.Linear(self.hidden_size,self.hidden_size)
+        self.w = Variable(torch.randn(1,256))
         
         #MLP
         self.MLP_hidden_size = 256
@@ -164,27 +165,20 @@ class DecoderRNN(nn.Module):
         print(output.shape)
         return F.log_softmax(output, dim=1),hidden
        # return F.log_softmax(Y,dim=1),C,hidden1,hidden2,hidden3  #         разобраться с softmax!
+    
+    def attention(self,hidden,outEncoder):# то есть hidden это 1*1*256; outEncoder это 10*1*256
+        out1 = self.att_fc1(hidden)
+        e=Variable(torch.FloatTensor(outEncoder.shape[0]).zero_())
+        i=0
+        for out_enc_i in outEncoder:
+             out2 = torch.unsqueeze(out_enc_i,0)
+             out2=self.att_fc2(out2)
+             out=F.tanh(out1+out2)
+             out=out.view(-1,1)
+             e[i]= torch.mm(self.w,out)
+             i=i+1
+        return F.softmax(e)     
         
-    
-#    def attention(hidden,outsEncoder):
-#        #все параметры будут обуучаться
-#        
-#        attn_W = Variable(torch.randn(256,256))# временно какая вообще размерность у нее должна быть?
-#        attn_V = Variable(torch.randn(outsEncoder.shape[0],outsEncoder.shape[1]))
-#        b=torch.randn(256) 
-#        w=torch.randn(256) # тоже вектор весов.
-#        E = torch.zeros(hidden.shape,outsEncoder.shape[0])
-#        for k in range(E.shape[0]):
-#            for i in range(E.shape[1]):
-#                 E[k][i] = F.tanh(torch.bmm(attn_W,hidden)+torch.bmm(attn_V,outsEncoder)+b)
-#                 E[k][i]=torch.bmm(w,E[k][i])    
-#        
-#        for k in range(E.shape[0]):
-#            E[k] = F.softmax(E[k])    
-#        print(E.shape)
-#        return E
-#        
-    
 encoder = EncoderRNN()
 #print(encoder)
 
@@ -209,5 +203,12 @@ Y_answer=Variable(torch.torch.randn(count_character,1,36)) # верные Y
 out_RNN,hidden_RNN = decoder(Y_answer,hidden) #Y_NN - что выдала NN
 print(out_RNN.shape)
 #print(hidden_RNN.shape)
-#
-##%% 
+
+#%%
+# test attention
+decoder= DecoderRNN()
+hidden=Variable(torch.torch.randn(1,1,256)) 
+out=Variable(torch.torch.randn(10,1,256)) 
+decoder.attention(hidden,out)
+
+#%%
