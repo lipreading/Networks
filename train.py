@@ -15,34 +15,48 @@ def to_var(x, volatile=False):
     return Variable(x, volatile=volatile)
 
 
- # Load to GPU
-if cuda.is_available():
-    print('cuda is available!')
-    use_cuda = True
-
-
-def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion):
+def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda):
 
     encoder_hidden = encoder.initHidden()
+
+    frames = Variable(frames)
 
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
 
     input_length = frames.size()[0]
-
-    encoder_outputs = Variable(torch.zeros(input_length, encoder.hidden_size))
-    encoder_outputs = encoder_outputs.cuda() if use_cuda else encoder_outputs
+    target_length = targets.size()[0]
+    #
+    # encoder_outputs = Variable(torch.zeros(input_length, encoder.hidden_size))
+    # encoder_outputs = encoder_outputs.cuda() if use_cuda else encoder_outputs
 
     loss = 0
 
-    for ei in range(input_length):
-        encoder_output, encoder_hidden = encoder(frames[ei], encoder_hidden)
-        encoder_outputs[ei] = encoder_output[0][0]
+    # for ei in range(input_length):
+    #     print('Inside ei: ', frames[ei])
+    #     encoder_output, encoder_hidden = encoder(frames[ei], encoder_hidden)
+    #     encoder_outputs[ei] = encoder_output[0][0]
 
-    dec
+    encoder_output, encoder_hidden = encoder(frames)
+
+    decoder_hidden = encoder_hidden
+
+    for di in range(target_length):
+        decoder_input = targets[di]
+        decoder_output, decoder_hidden = decoder(decoder_input, decoder_hidden)
+        loss += criterion(decoder_output, targets[di])  # Тут непонятно, как учитывать <sos>?
+
+    loss.backward()
+    encoder_optimizer.step()
+    decoder_optimizer.step()
+
+    return loss.data[0] / target_length
 
 
-def trainIters(encoder, decoder, num_epochs=NUM_EPOCHS, print_every=10, plot_every=10, learning_rate=LEARNING_RATE):
+def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
+                print_every=10, plot_every=10, learning_rate=LEARNING_RATE):
+
+
     start = time.time()
     plot_losses = []
     print_loss_total = 0
@@ -57,8 +71,10 @@ def trainIters(encoder, decoder, num_epochs=NUM_EPOCHS, print_every=10, plot_eve
 
     for epoch in range(num_epochs + 1):
         for i, (frames, targets) in enumerate(data_loader):
-            frames.view(-1, 5, 120, 120)
-            loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
+            frames = frames.view(-1, 5, 120, 120)
+            print(frames.shape)
+            # print(frames)
+            loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
 
             print_loss_total += loss
             plot_loss_total += loss
@@ -70,7 +86,12 @@ def trainIters(encoder, decoder, num_epochs=NUM_EPOCHS, print_every=10, plot_eve
             #                                  iter, iter / n_iters * 100, print_loss_avg))
 
 
+use_cuda = False
+if cuda.is_available():
+    print('cuda is available!')
+    use_cuda = True
 
 # Build the model
 encoder = EncoderRNN()
 decoder = DecoderRNN()
+train_iters(encoder, decoder, use_cuda)

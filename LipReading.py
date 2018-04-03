@@ -174,29 +174,29 @@ class DecoderRNN(nn.Module):
 #        return E
 #        
 
-encoder = EncoderRNN()
-# print(encoder)
-
-seq_len = 10
-input = Variable(torch.randn(10, 5, 120, 120))
-hidden = encoder.initHidden()
-out, hidden = encoder(input)
-print(out.shape)
-# print(hidden[0].shape)
+# encoder = EncoderRNN()
+# # print(encoder)
 #
+# seq_len = 10
+# input = Variable(torch.randn(10, 5, 120, 120))
+# hidden = encoder.initHidden()
+# out, hidden = encoder(input)
+# print(out.shape)
+# # print(hidden[0].shape)
+# #
+# #
+# #
+# #
+# #
+# #
+# print("FINISH ENCODER")
+# ##
+# decoder = DecoderRNN()
 #
-#
-#
-#
-#
-print("FINISH ENCODER")
-##
-decoder = DecoderRNN()
-
-count_character = 100
-Y_answer = Variable(torch.torch.randn(count_character, 1, 36))  # верные Y
-out_RNN, hidden_RNN = decoder(Y_answer, hidden)  # Y_NN - что выдала NN
-print(out_RNN.shape)
-# print(hidden_RNN.shape)
-#
-##%%
+# count_character = 100
+# Y_answer = Variable(torch.torch.randn(count_character, 1, 36))  # верные Y
+# out_RNN, hidden_RNN = decoder(Y_answer, hidden)  # Y_NN - что выдала NN
+# print(out_RNN.shape)
+# # print(hidden_RNN.shape)
+# #
+# ##%%

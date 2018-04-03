@@ -49,7 +49,7 @@ class LipsDataset(data.Dataset):
             count += 1
         frames = torch.from_numpy(frames)
         # print(frames.shape)
-        frames = frames.view(-1, 5, 120, 120)
+        # frames = frames.view(-1, 5, 120, 120)
 
         # загружаем субтитры
         subs_path = [name for name in os.listdir(curr_dir) if re.match(r'__', name)][0]
@@ -67,8 +67,8 @@ class LipsDataset(data.Dataset):
         targets = torch.IntTensor(len(characters), 36).zero_()
         for i in range(len(characters)):
             targets[i][characters[i]] = 1
-        print(targets.shape)
-        print(frames.shape)
+        # print(targets.shape)
+        # print(frames.shape)
         return frames, targets
 
 
@@ -93,9 +93,9 @@ def get_loader():
 # dataset = LipsDataset()
 # print(dataset[800].shape)
 
-data_loader = get_loader()
-for i, (frames, targets) in enumerate(data_loader):
-    print(i)
-    print(frames.size())
-    # print(frames)
-    # print(targets)
+# data_loader = get_loader()
+# for i, (frames, targets) in enumerate(data_loader):
+#     print(i)
+#     print(frames.size())
+#     # print(frames)
+#     # print(targets)
