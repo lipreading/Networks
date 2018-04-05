@@ -32,13 +32,13 @@ class EncoderRNN(nn.Module):
     def forward(self, input):
         #        output = self.CNN(input)
         CNN_out = Variable(
-            torch.DoubleTensor(input.shape[0], 512).zero_())  # то есть первый параметр это seq_len; второй выход CNN
+            torch.FloatTensor(input.shape[0], 512).zero_())  # то есть первый параметр это seq_len; второй выход CNN
 
         for i in range(input.shape[0]):  # кидаем по одному в CNN
             CNN_in = torch.unsqueeze(input[i], 0)  # то есть размерность 1*5*120*120
             CNN_out[i] = self.CNN(CNN_in)
 
-        print(CNN_out.shape)  # seq_len*512
+        # print(CNN_out.shape)  # seq_len*512
         return self.RNN(CNN_out)
 
     #        out = self.CNN(input)
@@ -56,11 +56,12 @@ class EncoderRNN(nn.Module):
     #
     def RNN(self, input):  # input.shape= seq_len*512
         hidden = self.initHidden()
-        input = torch.unsqueeze(input, 1)
+        input = torch.unsqueeze(input, 1).float()
         # print(input.shape)
+        # print(input)
         output, hidden = self.lstm1(input, hidden)
-        print("outRNN", output.shape)
-        print("hiddenRNN", hidden[0].shape)
+        # print("outRNN", output.shape)
+        # print("hiddenRNN", hidden[0].shape)
         return output, hidden
 
     def initHidden(self):
@@ -150,7 +151,7 @@ class DecoderRNN(nn.Module):
             yi = self.fc2(yi)
             output[i] = yi
 
-        print(output.shape)
+        # print(output.shape)
         return F.log_softmax(output, dim=1), hidden
     # return F.log_softmax(Y,dim=1),C,hidden1,hidden2,hidden3  #         разобраться с softmax!
 

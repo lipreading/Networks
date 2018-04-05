@@ -61,9 +61,10 @@ class LipsDataset(data.Dataset):
         # print(characters)
 
         # преобразовываем к виду выходной матрицы
-        targets = torch.IntTensor(len(characters), 36).zero_()
-        for i in range(len(characters)):
-            targets[i][characters[i]] = 1
+        # targets_for_training = torch.LongTensor(len(characters), 36).zero_()
+        # for i in range(len(characters)):
+        #     targets[i][characters[i]] = 1
+        targets = torch.LongTensor(characters)
         # print(targets.shape)
         # print(frames.shape)
         return frames, targets
