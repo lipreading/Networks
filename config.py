@@ -2,5 +2,5 @@ TRAINED_MODEL_PATH = ''  # куда сохранять тренированны�
 FRAME_DIR = 'test_frames'  # директория с исходниками кадров
 
 LEARNING_RATE = 0.001
-NUM_EPOCHS = 10
+NUM_EPOCHS = 5
 BATCH_SIZE = 5

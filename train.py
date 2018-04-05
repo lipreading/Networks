@@ -7,6 +7,7 @@ import torch
 from Networks.LipReading import EncoderRNN, DecoderRNN
 from Networks.config import *
 from Networks.data_loader import get_loader
+from Networks.utilities import show_plot
 
 
 def to_var(x, volatile=False):
@@ -60,6 +61,7 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
 
     # Загружаем данные - в итоге получаем объект типа torch.utils.data.Dataloader,
     data_loader = get_loader()
+    words_amount = 0
 
     for epoch in range(1, num_epochs+1):
         for i, (frames, targets) in enumerate(data_loader):
@@ -77,12 +79,15 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
 
             print_loss_total += loss
             plot_loss_total += loss
+            words_amount += 1
 
-        print('iteration: {}, loss: {}'.format(epoch, print_loss_total))
+        print('iteration: {}, loss: {}'.format(epoch, print_loss_total/words_amount))
         print_loss_total = 0
 
-        plot_losses.append(plot_loss_total)
+        plot_losses.append(plot_loss_total/words_amount)
         plot_loss_total = 0
+
+    show_plot(plot_losses)
 
 
 use_cuda = False
