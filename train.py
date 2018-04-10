@@ -65,7 +65,8 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
 
     for epoch in range(1, num_epochs+1):
         for i, (frames, targets) in enumerate(data_loader):
-            frames = frames.view(-1, 5, 120, 120)
+            # print(frames)
+            frames = torch.squeeze(frames)  # DataLoader почему-то прибавляет лишнее измерение
             targets = torch.squeeze(targets)
 
             targets_for_training = torch.LongTensor(targets.shape[0], 36).zero_()
@@ -97,7 +98,5 @@ if cuda.is_available():
 
 # Build the model
 encoder = EncoderRNN()
-# encoder = encoder.float()
 decoder = DecoderRNN()
-# decoder = decoder.float()
 train_iters(encoder, decoder, use_cuda)
