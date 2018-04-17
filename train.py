@@ -1,3 +1,6 @@
+
+
+#%%
 from torch import nn, cuda, optim
 from torch.autograd import Variable
 import time
@@ -32,8 +35,15 @@ def train(frames, targets_for_training, targets, encoder, decoder, encoder_optim
     # target_length = targets_for_training.size()[0]
 
     encoder_output, encoder_hidden = encoder(frames)
-
-    decoder_output, decoder_hidden = decoder(targets_for_training, encoder_hidden)
+    print("enout",encoder_output.shape)
+    encoder_output = torch.squeeze(encoder_output,1)
+    decoder_output = decoder(targets_for_training, encoder_hidden[0],encoder_hidden[1],encoder_output)
+    
+    decoder_output = torch.squeeze(decoder_output,1)
+#    print(targets.shape)
+#    targets = torch.squeeze(targets,1)
+    print("lol",decoder_output.shape)
+    print("kek",targets.shape)
     loss = criterion(decoder_output, targets)
 
     # print(loss.data[0])

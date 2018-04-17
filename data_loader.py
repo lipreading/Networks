@@ -1,3 +1,5 @@
+
+#%%
 import torch.utils.data as data
 import os, os.path
 import re
@@ -18,7 +20,7 @@ class LipsDataset(data.Dataset):
         self.alphabet = Alphabet()
         self.words = [name for name in os.listdir(FRAME_DIR)]
         self.count = 0
-
+        print(FRAME_DIR)
     def __len__(self):
         return len(self.words)
 
