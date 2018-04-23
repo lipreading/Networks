@@ -7,10 +7,10 @@ import time
 import math
 import torch
 
-from Networks.LipReading import EncoderRNN, DecoderRNN
-from Networks.config import *
-from Networks.data_loader import get_loader
-from Networks.utilities import show_plot
+from LipReading import EncoderRNN, DecoderRNN
+from config import *
+from data_loader import get_loader
+from utilities import show_plot
 
 
 def to_var(x, volatile=False):
@@ -74,10 +74,14 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
     words_amount = 0
 
     for epoch in range(1, num_epochs+1):
-        for i, (frames, targets) in enumerate(data_loader):
+        for i, (frames, targets, is_valid) in enumerate(data_loader):
             # print(frames)
-            frames = torch.squeeze(frames)  # DataLoader почему-то прибавляет лишнее измерение
-            targets = torch.squeeze(targets)
+            # print(is_valid[0])
+            if not is_valid[0]:
+                continue
+            frames = torch.squeeze(frames, dim=0)  # DataLoader почему-то прибавляет лишнее измерение
+            targets = torch.squeeze(targets, dim=0)
+            # print(frames.shape)
 
             targets_for_training = torch.LongTensor(targets.shape[0], 36).zero_()
             for i in range(targets.shape[0]):

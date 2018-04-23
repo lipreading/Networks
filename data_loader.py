@@ -8,8 +8,8 @@ import numpy as np
 import torch
 import json
 
-from Networks.config import FRAME_DIR, BATCH_SIZE
-from Networks.alphabet import Alphabet
+from config import FRAME_DIR, BATCH_SIZE
+from alphabet import Alphabet
 
 
 class LipsDataset(data.Dataset):
@@ -21,6 +21,7 @@ class LipsDataset(data.Dataset):
         self.words = [name for name in os.listdir(FRAME_DIR)]
         self.count = 0
         print(FRAME_DIR)
+
     def __len__(self):
         return len(self.words)
 
@@ -29,6 +30,12 @@ class LipsDataset(data.Dataset):
         # загружаем все кадры для слова
         curr_dir = self.frame_dir + '/' + self.words[index]
         frames_list = [name for name in os.listdir(curr_dir) if not re.match(r'__', name)]
+        print(frames_list)
+
+        if len(frames_list) < BATCH_SIZE:
+            is_valid = False
+        else:
+            is_valid = True
 
         frames = np.zeros((len(frames_list), 120, 120))
         count = 0
@@ -39,7 +46,8 @@ class LipsDataset(data.Dataset):
         frames = torch.from_numpy(frames)
 
         # разбиваем на батчи
-        frames = make_batches(frames)
+        if is_valid:
+            frames = make_batches(frames)
 
         # загружаем субтитры
         subs_path = [name for name in os.listdir(curr_dir) if re.match(r'__', name)][0]
@@ -52,7 +60,7 @@ class LipsDataset(data.Dataset):
         characters.append(self.alphabet.ch2index('<eos>'))
 
         targets = torch.LongTensor(characters)
-        return frames, targets
+        return frames, targets, is_valid
 
 
 def get_loader():
@@ -65,6 +73,7 @@ def get_loader():
 
 def make_batches(data_tensor, batch_size=BATCH_SIZE):
     new_size = data_tensor.shape[0] - batch_size + 1
+    # print('new size: ', new_size)
     new_data_tensor = torch.FloatTensor(new_size, 5, 120, 120).zero_()
     # print(new_data_tensor)
     for i in range(new_size):
