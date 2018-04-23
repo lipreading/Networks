@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import torch
 
 
 def show_plot(points):
@@ -11,3 +12,8 @@ def show_plot(points):
     plt.interactive(False)
     plt.plot(points)
     plt.show()
+
+
+def save_model(encoder, decoder):
+    torch.save(encoder.state_dict(), os.path.join(TRAINED_MODEL_PATH, 'encoder'))
+    torch.save(decoder.state_dict(), os.path.join(TRAINED_MODEL_PATH, 'decoder'))

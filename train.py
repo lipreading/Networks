@@ -10,7 +10,7 @@ import torch
 from LipReading import EncoderRNN, DecoderRNN
 from config import *
 from data_loader import get_loader
-from utilities import show_plot
+from utilities import show_plot, save_model
 
 
 def to_var(x, volatile=False):
@@ -114,3 +114,5 @@ if cuda.is_available():
 encoder = EncoderRNN()
 decoder = DecoderRNN()
 train_iters(encoder, decoder, use_cuda)
+
+save_model(encoder, decoder)
