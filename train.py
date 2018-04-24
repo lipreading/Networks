@@ -35,15 +35,12 @@ def train(frames, targets_for_training, targets, encoder, decoder, encoder_optim
     # target_length = targets_for_training.size()[0]
 
     encoder_output, encoder_hidden = encoder(frames)
-    print("enout",encoder_output.shape)
     encoder_output = torch.squeeze(encoder_output,1)
     decoder_output = decoder(targets_for_training, encoder_hidden[0],encoder_hidden[1],encoder_output)
     
     decoder_output = torch.squeeze(decoder_output,1)
 #    print(targets.shape)
 #    targets = torch.squeeze(targets,1)
-    print("lol",decoder_output.shape)
-    print("kek",targets.shape)
     loss = criterion(decoder_output, targets)
 
     # print(loss.data[0])
@@ -83,13 +80,16 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
             targets = torch.squeeze(targets, dim=0)
             # print(frames.shape)
 
-            targets_for_training = torch.LongTensor(targets.shape[0], 36).zero_()
+            targets_for_training = torch.LongTensor(targets.shape[0], 47).zero_()
             for i in range(targets.shape[0]):
                 targets_for_training[i][targets[i]] = 1
             # print('targets for training: ', targets_for_training.shape)
-            targets_for_training = targets_for_training.view(-1, 1, 36)
+            targets_for_training = targets_for_training.view(-1, 1, 47)
             # print('targets: ', targets.shape)
             # print('frames: ', frames.shape)
+            if i%10==0:
+                test_loss = evaluate(frames, targets_for_training, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
+                print("test_loss",test_loss)            
             loss = train(frames, targets_for_training, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
 
             print_loss_total += loss
@@ -104,6 +104,24 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
 
     show_plot(plot_losses)
 
+def evaluate(frames, targets_for_training, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda):
+
+    encoder_hidden = encoder.initHidden()
+
+    frames = frames.float()
+    targets_for_training = targets_for_training.float()
+    frames, targets_for_training, targets = Variable(frames), \
+                                            Variable(targets_for_training), Variable(targets)
+
+
+    encoder_output, encoder_hidden = encoder(frames)
+    encoder_output = torch.squeeze(encoder_output,1)
+
+    decoder_output = decoder.evaluate(encoder_hidden[0],encoder_hidden[1],encoder_output)    
+    decoder_output = torch.squeeze(decoder_output,1)
+
+    loss = criterion(decoder_output, targets) 
+    return loss.data[0]
 
 use_cuda = False
 if cuda.is_available():

@@ -3,7 +3,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-
+from Networks.alphabet import Alphabet
 class EncoderRNN(nn.Module):
 
     def __init__(self):
@@ -110,7 +110,7 @@ class DecoderRNN(nn.Module):
         super(DecoderRNN, self).__init__()
         # LSTM
         self.hidden_size=256
-        self.lstm1=nn.LSTMCell(36,self.hidden_size) #кол-во букв в русском алфавите = 33 и еще + 3.
+        self.lstm1=nn.LSTMCell(47,self.hidden_size) #кол-во букв в русском алфавите = 33 и еще + 3.
 
 #        attention
         self.att_fc1=nn.Linear(self.hidden_size,self.hidden_size)
@@ -125,13 +125,12 @@ class DecoderRNN(nn.Module):
         self.MLP_hidden_size = 256
         self.MLP_fc1 = nn.Linear(2*self.MLP_hidden_size,self.MLP_hidden_size)        
         self.MLP_fc2 = nn.Linear(self.MLP_hidden_size,self.MLP_hidden_size)        
-        self.MLP_fc3=nn.Linear(self.MLP_hidden_size,36)
+        self.MLP_fc3=nn.Linear(self.MLP_hidden_size,47)
         
     def forward(self,Y,h,c, outEncoder):
         h = torch.squeeze(h,0)
         c = torch.squeeze(c,0)
-        output_decoder= torch.autograd.Variable(torch.zeros(Y.shape[0], 1, 36))
-        print("out begin",output_decoder.shape)
+        output_decoder= torch.autograd.Variable(torch.zeros(Y.shape[0], 1, 47))
         for  i in range(len(Y)):
             h,cLSTM = self.lstm1(Y[i],(h,c))
             c = self.attention(h, outEncoder)
@@ -139,9 +138,34 @@ class DecoderRNN(nn.Module):
             c = torch.mm(c,outEncoder)
             output_decoder[i] = self.MLP( torch.cat( (cLSTM,c),1 ) )
 #            print(output_decoder.shape)
-        print("outtt",output_decoder.shape)
         return output_decoder
        # return F.log_softmax(Y,dim=1),C,hidden1,hidden2,hidden3  #         разобраться с softmax!
+    
+    def evaluate(self,h,c,outEncoder):
+        h = torch.squeeze(h,0)
+        c = torch.squeeze(c,0)
+        max_len = 30
+        result = Variable(torch.FloatTensor(max_len,1,47).zero_())
+        Y_cur = torch.FloatTensor(1,47).zero_()
+        alphabet = Alphabet()
+        Y_cur[0][alphabet.ch2index('<sos>')] = 1.0
+        Y_cur=Variable(Y_cur)
+        for  i in range(max_len):
+            h,cLSTM = self.lstm1(Y_cur,(h,c))
+            c = self.attention(h, outEncoder)
+#            c = torch.mm( torch.unsqueeze(c,torch.squeeze(self.outEncoder,1) )
+            c = torch.mm(c,outEncoder)
+            char = self.MLP( torch.cat( (cLSTM,c),1 ) )
+            result[i] = char
+            Y_cur= char
+            argmax = torch.max(Y_cur.data[0],dim=0)
+            argmax=argmax[1]
+            if argmax[0] == alphabet.ch2index('<eos>'):
+                max_len=i+1
+                break
+#            print(output_decoder.shape)
+        return result[:max_len]        
+ 
     
     def MLP(self,v):
         v = F.relu(self.MLP_fc1(v))
@@ -190,7 +214,7 @@ class DecoderRNN(nn.Module):
 #decoder= DecoderRNN()
 #print(out.shape)
 #count_character=100
-#Y_answer=Variable(torch.torch.randn(count_character,1,36)) # верные Y
+#Y_answer=Variable(torch.torch.randn(count_character,1,47)) # верные Y
 #out_RNN = decoder(Y_answer,hidden[0],hidden[1],out) #Y_NN - что выдала NN
 ## И в следующий декодер передаем hidden_RNN и C
 #
