@@ -1,9 +1,12 @@
+import sys
+sys.path.append('/home/a.chernov/anaconda3/lib/python3.5/site-packages')
+
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from Networks.alphabet import Alphabet
+from alphabet import Alphabet
 class EncoderRNN(nn.Module):
 
     def __init__(self):
@@ -174,7 +177,7 @@ class DecoderRNN(nn.Module):
         return v 
     def attention(self,hidden, outEncoder):# то есть hidden это 1*1*256; outEncoder это 10*1*256        
         outEnSize= outEncoder.shape[0]
-        print("hid",hidden.shape)
+      #  print("hid",hidden.shape)
         hidden= torch.t(hidden.expand(outEnSize,-1))
         WS = torch.mm(self.att_W,hidden)       
 #        print(outEncoder.shape)
@@ -190,7 +193,7 @@ class DecoderRNN(nn.Module):
 #             out=out.view(-1,1)
 #             e[i]= torch.mm(self.w,out)
 #             i=i+1
-        return F.softmax(E)          
+        return F.softmax(E,dim=1)          
 #%%        
 #encoder = EncoderRNN()
 ##print(encoder)

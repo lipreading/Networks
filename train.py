@@ -1,6 +1,9 @@
 
 
 #%%
+import sys
+# sys.path.append('/home/a.chernov/anaconda3/lib/python3.5/site-packages')
+
 from torch import nn, cuda, optim
 from torch.autograd import Variable
 import time
@@ -10,7 +13,7 @@ import torch
 from LipReading import EncoderRNN, DecoderRNN
 from config import *
 from data_loader import get_loader
-from utilities import show_plot, save_model
+from utilities import save_model
 
 
 def to_var(x, volatile=False):
@@ -81,28 +84,38 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
             # print(frames.shape)
 
             targets_for_training = torch.LongTensor(targets.shape[0], 47).zero_()
-            for i in range(targets.shape[0]):
-                targets_for_training[i][targets[i]] = 1
+            for j in range(targets.shape[0]):
+                targets_for_training[j][targets[j]] = 1
             # print('targets for training: ', targets_for_training.shape)
             targets_for_training = targets_for_training.view(-1, 1, 47)
             # print('targets: ', targets.shape)
             # print('frames: ', frames.shape)
             if i%10==0:
                 test_loss = evaluate(frames, targets_for_training, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
-                print("test_loss",test_loss)            
+                print("test_loss",test_loss)
+                with open('short/testLossAdam.txt', 'a') as f:
+               	     s = 'epoch=' + str(epoch) +' i=' + str(i) + 'test_loss=' +str(test_loss)+'\n'
+                     f.write(s)            
             loss = train(frames, targets_for_training, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
-
+            print("finished words:",i+1)
+            print("train_loss",loss)
+            with open('short/trainLossAdam.txt', 'a') as f:
+                     s = 'epoch=' + str(epoch) +' i=' + str(i) + 'train_loss=' +str(loss)+'\n'                     
+                     f.write(s) 
             print_loss_total += loss
             plot_loss_total += loss
             words_amount += 1
-
+        
+        with open('short/trainLossAdam.txt', 'a') as f:
+                     s = 'finish epoch=' + str(epoch) + 'train_loss=' +str(print_loss_total)+'\n'
+                     f.write(s)
         print('iteration: {}, loss: {}'.format(epoch, print_loss_total/words_amount))
         print_loss_total = 0
 
         plot_losses.append(plot_loss_total/words_amount)
         plot_loss_total = 0
 
-    show_plot(plot_losses)
+ #   show_plot(plot_losses)
 
 def evaluate(frames, targets_for_training, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda):
 
@@ -119,9 +132,14 @@ def evaluate(frames, targets_for_training, targets, encoder, decoder, encoder_op
 
     decoder_output = decoder.evaluate(encoder_hidden[0],encoder_hidden[1],encoder_output)    
     decoder_output = torch.squeeze(decoder_output,1)
-
-    loss = criterion(decoder_output, targets) 
-    return loss.data[0]
+ #   print(targets.shape)
+ #   print(decoder_output.shape)	
+    if len(targets)<=len(decoder_output):
+        loss = criterion(decoder_output[:len(targets)], targets) 
+        return loss.data[0]
+    if len(targets)>len(decoder_output):
+        loss = criterion(decoder_output, targets[:len(decoder_output)])
+        return loss.data[0]   
 
 use_cuda = False
 if cuda.is_available():
