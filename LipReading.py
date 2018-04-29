@@ -3,7 +3,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from Networks.alphabet import Alphabet
+from alphabet import Alphabet
 class EncoderRNN(nn.Module):
 
     def __init__(self):
@@ -22,7 +22,7 @@ class EncoderRNN(nn.Module):
         # batch norm for CNN
         self.batchNorm1 = nn.BatchNorm2d(96)
         self.batchNorm2 = nn.BatchNorm2d(256)
-        self.lstm1=nn.LSTM(512,self.hidden_size)
+        self.lstm1=nn.LSTM(512,self.hidden_size,num_layers=1)
 #        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
 #        self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)       
         
@@ -31,11 +31,7 @@ class EncoderRNN(nn.Module):
 #        output = self.CNN(input)            
         CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_()) # то есть первый параметр это seq_len; второй выход CNN
         
-        for i in range(input.shape[0]):   #кидаем по одному в CNN
-            CNN_in = torch.unsqueeze(input[i],0) # то есть размерность 1*5*120*120
-            CNN_out[i] = self.CNN(CNN_in)
-
-        # print(CNN_out.shape)  # seq_len*512
+        CNN_out=self.CNN(input)
         return self.RNN(CNN_out)
 
     #        out = self.CNN(input)
@@ -98,7 +94,7 @@ class EncoderRNN(nn.Module):
         # print(x.shape)
 
         # 6
-        x = x.view(32768)
+        x = x.view(x.shape[0],32768)
         x = self.fc6(x)  # должна ли быть функция актвации для последнего слоя?
 
         return x
@@ -190,25 +186,25 @@ class DecoderRNN(nn.Module):
 #             out=out.view(-1,1)
 #             e[i]= torch.mm(self.w,out)
 #             i=i+1
-        return F.softmax(E)          
+        return F.softmax(E, dim=1)          
 #%%        
-#encoder = EncoderRNN()
-##print(encoder)
+encoder = EncoderRNN()
+#print(encoder)
+
+seq_len=10
+input = Variable(torch.randn(10,5,120, 120))
+hidden = encoder.initHidden()
+out,hidden = encoder(input)
+print(out.shape)
+#print(hidden[0].shape)
 #
-#seq_len=10
-#input = Variable(torch.randn(10,5,120, 120))
-#hidden = encoder.initHidden()
-#out,hidden = encoder(input)
-#print(out.shape)
-##print(hidden[0].shape)
-##
-##
-##
-##
-##
-##
 #
-#print("FINISH ENCODER")
+#
+#
+#
+#
+
+print("FINISH ENCODER")
 ###
 #out = torch.squeeze(out,1)
 #decoder= DecoderRNN()

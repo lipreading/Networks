@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import json
 
-from config import FRAME_DIR, BATCH_SIZE
+from config import FRAME_DIR, COUNT_FRAMES
 from alphabet import Alphabet
 
 
@@ -30,9 +30,8 @@ class LipsDataset(data.Dataset):
         # загружаем все кадры для слова
         curr_dir = self.frame_dir + '/' + self.words[index]
         frames_list = [name for name in os.listdir(curr_dir) if not re.match(r'__', name)]
-        print(frames_list)
-
-        if len(frames_list) < BATCH_SIZE:
+   
+        if len(frames_list) < COUNT_FRAMES:
             is_valid = False
         else:
             is_valid = True
@@ -66,13 +65,13 @@ class LipsDataset(data.Dataset):
 def get_loader():
 
     lips_dataset = LipsDataset()
-    data_loader = torch.utils.data.DataLoader(dataset=lips_dataset)
+    data_loader = torch.utils.data.DataLoader(dataset=lips_dataset,num_workers=10)
     # print(data_loader)
     return data_loader
 
 
-def make_batches(data_tensor, batch_size=BATCH_SIZE):
-    new_size = data_tensor.shape[0] - batch_size + 1
+def make_batches(data_tensor, COUNT_FRAMES=COUNT_FRAMES):
+    new_size = data_tensor.shape[0] - COUNT_FRAMES + 1
     # print('new size: ', new_size)
     new_data_tensor = torch.FloatTensor(new_size, 5, 120, 120).zero_()
     # print(new_data_tensor)

@@ -33,7 +33,7 @@ def train(frames, targets_for_training, targets, encoder, decoder, encoder_optim
 
     # input_length = frames.size()[0]
     # target_length = targets_for_training.size()[0]
-
+    print("frames",frames.shape)
     encoder_output, encoder_hidden = encoder(frames)
     encoder_output = torch.squeeze(encoder_output,1)
     decoder_output = decoder(targets_for_training, encoder_hidden[0],encoder_hidden[1],encoder_output)
@@ -55,7 +55,7 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                 print_every=10, plot_every=10, learning_rate=LEARNING_RATE):
 
     print('ITERATIONS: {}, BATCH SIZE: {}, LEARNING RATE: {}'
-          .format(num_epochs, BATCH_SIZE, learning_rate))
+          .format(num_epochs, COUNT_FRAMES, learning_rate))
     print('====================================================================')
     start = time.time()
     plot_losses = []
