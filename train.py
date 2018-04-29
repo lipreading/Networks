@@ -28,8 +28,8 @@ def train(frames, targets_for_training, targets, encoder, decoder, encoder_optim
 
     frames = frames.float()
     targets_for_training = targets_for_training.float()
-    frames, targets_for_training, targets = Variable(frames), \
-                                            Variable(targets_for_training), Variable(targets)
+    frames, targets_for_training, targets = to_var(frames), \
+                                            to_var(targets_for_training), to_var(targets)
 
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
@@ -123,8 +123,8 @@ def evaluate(frames, targets_for_training, targets, encoder, decoder, encoder_op
 
     frames = frames.float()
     targets_for_training = targets_for_training.float()
-    frames, targets_for_training, targets = Variable(frames), \
-                                            Variable(targets_for_training), Variable(targets)
+    frames, targets_for_training, targets = to_var(frames), \
+                                            to_var(targets_for_training), to_var(targets)
 
 
     encoder_output, encoder_hidden = encoder(frames)
@@ -149,6 +149,11 @@ if cuda.is_available():
 # Build the model
 encoder = EncoderRNN()
 decoder = DecoderRNN()
+if cuda.is_available():
+    print('cuda is available!')
+    use_cuda = True
+    encoder.cuda()
+    decoder.cuda()
 train_iters(encoder, decoder, use_cuda)
 
 save_model(encoder, decoder)
