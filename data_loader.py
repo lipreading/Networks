@@ -29,9 +29,10 @@ class LipsDataset(data.Dataset):
 
         # загружаем все кадры для слова
         curr_dir = self.frame_dir + '/' + self.words[index]
-        frames_list = [name for name in os.listdir(curr_dir) if not re.match(r'__', name)]
-   
+        frames_list = [name for name in os.listdir(curr_dir) if not re.match(r'__', name)]   
         if len(frames_list) < COUNT_FRAMES:
+        #print(frames_list)
+
             is_valid = False
         else:
             is_valid = True
@@ -55,6 +56,9 @@ class LipsDataset(data.Dataset):
         characters = list()
         characters.append(self.alphabet.ch2index('<sos>'))
         for ch in subs:
+            if self.alphabet.ch2index(ch) is None:
+                is_valid = False
+                break
             characters.append(self.alphabet.ch2index(ch))
         characters.append(self.alphabet.ch2index('<eos>'))
 

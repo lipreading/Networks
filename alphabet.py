@@ -47,7 +47,7 @@ class Alphabet:
             '6':43, 
             '7':44, 
             '8':45, 
-            '9':46,} 
+            '9':46} 
         self.length = 47
 
     def ch2index(self, ch):

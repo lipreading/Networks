@@ -6,3 +6,4 @@ FRAME_DIR = '/home/andrey/datasetsNN/LipReading/FramePack2/framePacks/short'  # 
 LEARNING_RATE = 0.001
 NUM_EPOCHS = 5
 COUNT_FRAMES = 5
+
