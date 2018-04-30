@@ -1,3 +1,4 @@
+#%%
 class Alphabet:
     def __init__(self):
         self.alph_dict = {
@@ -52,3 +53,7 @@ class Alphabet:
 
     def ch2index(self, ch):
         return self.alph_dict.get(ch)
+
+#%%
+alphabet = Alphabet()
+print(alphabet.ch2index('ы'))        
