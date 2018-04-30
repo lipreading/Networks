@@ -134,21 +134,17 @@ class DecoderRNN(nn.Module):
         c = torch.squeeze(c,0)
         max_len = 30
         result = Variable(torch.FloatTensor(max_len,1,self.hidden_size).zero_()).cuda()
-        Y_cur = torch.FloatTensor(1,self.hidden_size).zero_().cuda()
         alphabet = Alphabet()
-        Y_cur[0]=self.embedding(alphabet.ch2index('<sos>'))
-        Y_cur=Variable(Y_cur)
-        result[0][0]=self.embedding(alphabet.ch2index('<sos>'))
+        result[0]=self.embedding( Variable(torch.LongTensor([alphabet.ch2index('<sos>')]).cuda()) ).view(1,self.hidden_size)
         for  i in range(max_len-1):
             j=i+1
-            h,cLSTM = self.lstm1(Y_cur,(h,c))
+            h,cLSTM = self.lstm1(result[j-1],(h,c))
             c = self.attention(h, outEncoder)
 #            c = torch.mm( torch.unsqueeze(c,torch.squeeze(self.outEncoder,1) )
             c = torch.mm(c,outEncoder)
             char = self.MLP( torch.cat( (cLSTM,c),1 ) )
             result[j] = char
-            Y_cur= char  
-            argmax = torch.max(Y_cur.data[0],dim=0)
+            argmax = torch.max(result[j].data[0],dim=0)
             if argmax[0] == alphabet.ch2index('<eos>'):
                 max_len=j+1
                 break
@@ -226,3 +222,4 @@ class DecoderRNN(nn.Module):
 #target = Variable(torch.LongTensor([0, 1]))
 #output = loss(input, target)
 #print(output)
+#%%
