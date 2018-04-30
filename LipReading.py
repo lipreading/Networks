@@ -114,29 +114,31 @@ class DecoderRNN(nn.Module):
         self.MLP_fc2 = nn.Linear(self.MLP_hidden_size,self.MLP_hidden_size)        
         self.MLP_fc3=nn.Linear(self.MLP_hidden_size,47)
         
-    def forward(self,Y,h,c, outEncoder):# Y это кол-во символов умножить на 256
+    def forward(self,Y,h,c, outEncoder,teacher_force):# Y это кол-во символов умножить на 256
         h = torch.squeeze(h,0).cuda()
         c = torch.squeeze(c,0).cuda()
         output_decoder= torch.autograd.Variable(torch.zeros(Y.shape[0], 1, 47)).cuda()
         Y = self.embedding(Y).view(Y.shape[0], 1, self.hidden_size)
-        for  i in range(len(Y)):
-            h,cLSTM = self.lstm1(Y[i],(h,c))
+        
+        for  i in range(len(Y)-1): # -1 так как sos не учитывем в criterion
+            if ((np.random.rand()>teacher_force)or(i==0)):
+                h,cLSTM = self.lstm1(Y[i],(h,c))
+            else:
+                print("NOT REAL TARGET")
+                h,cLSTM=self.lstm1(output_decoder[i-1],(h,c))
             c = self.attention(h, outEncoder)
-#            c = torch.mm( torch.unsqueeze(c,torch.squeeze(self.outEncoder,1) )
             c = torch.mm(c,outEncoder).cuda()
             output_decoder[i] = self.MLP( torch.cat( (cLSTM,c),1 ) )
-#            print(output_decoder.shape)
         return output_decoder.cuda()
-       # return F.log_softmax(Y,dim=1),C,hidden1,hidden2,hidden3  #         разобраться с softmax!
     
-    def evaluate(self,h,c,outEncoder):
+    def evaluate(self,h,c,outEncoder): # sos в return быть не должно
         h = torch.squeeze(h,0)
         c = torch.squeeze(c,0)
-        max_len = 30
-        result = Variable(torch.FloatTensor(max_len,1,47).zero_()).cuda()
+        max_len = 20
+        result = torch.FloatTensor(max_len,1,47).zero_().cuda()
         alphabet = Alphabet()
+        listArgmax=[]# буквы, которые выдал
         Y_cur = self.embedding( Variable(torch.LongTensor([alphabet.ch2index('<sos>')]).cuda()) ).view(1,self.hidden_size)
-        result[0][0][alphabet.ch2index('<sos>')]=1.0
         for  i in range(max_len-1):
             j=i+1
             h,cLSTM = self.lstm1(Y_cur,(h,c))
@@ -144,13 +146,18 @@ class DecoderRNN(nn.Module):
 #            c = torch.mm( torch.unsqueeze(c,torch.squeeze(self.outEncoder,1) )
             c = torch.mm(c,outEncoder)
             char = self.MLP( torch.cat( (cLSTM,c),1 ) )
-            result[j] = char
-            argmax = torch.max(result[j].data[0],dim=0)
-            if argmax[0] == alphabet.ch2index('<eos>'):
-                max_len=j+1
-                break
-            Y_cur=self.embedding( Variable(torch.LongTensor([argmax[0]]).cuda()) ).view(1,self.hidden_size)
+           # print(char.data[0])
+            result[j] = char.data
+            argmax = torch.max(result[j][0],dim=0)
+            #print(result[j][0])
+            listArgmax.append(argmax[1][0])
+            if argmax[1][0] == alphabet.ch2index('<eos>'):
+               print("BREAK EVAL",argmax[1][0]) 
+               max_len=j+1
+               break
+            Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0]]).cuda()) ).view(1,self.hidden_size)
 #            print(output_decoder.shape)
+        print("chars",listArgmax)
         return result[:max_len]        
  
     

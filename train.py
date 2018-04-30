@@ -22,7 +22,7 @@ def to_var(x, volatile=False):
     return Variable(x, volatile=volatile)
 
 
-def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda):
+def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda,teacher_force):
 
     #encoder_hidden = encoder.initHidden()
 
@@ -40,11 +40,12 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
        
     encoder_output, encoder_hidden = encoder(frames,h0,c0)
     encoder_output = torch.squeeze(encoder_output,1)
-    decoder_output = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output)
+    decoder_output = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
     
     decoder_output = torch.squeeze(decoder_output,1).cuda()
 #    print(targets.shape)
 #    targets = torch.squeeze(targets,1)
+    targets=targets[1:]# убираем sos
     loss = criterion(decoder_output.cuda(), targets.cuda())
 
     # print(loss.data[0])
@@ -97,7 +98,17 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                 with open('short/testLossAdam.txt', 'a') as f:
                	     s = 'epoch=' + str(epoch) +' i=' + str(i) + 'test_loss=' +str(test_loss)+'\n'
                      f.write(s)            
-            loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
+            if epoch<=5:
+                teacher_force=0.0
+            else:
+                if epoch<=20:
+                    teacher_force=0.2
+                else:
+                    if epoch<=50:
+                        teacher_force=0.5
+                    else:
+                        teacher_force=1.0                        
+            loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda,teacher_force)
            # print("finished words:",i+1)
            #print("train_loss",loss)
             with open('short/trainLossAdam.txt', 'a') as f:
@@ -136,6 +147,8 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
     decoder_output = torch.squeeze(decoder_output,1)
  #   print(targets.shape)
  #   print(decoder_output.shape)
+    decoder_output=Variable(decoder_output)
+    targets=targets[1:]# убираем sos
     if len(targets)<=len(decoder_output):
         loss = criterion(decoder_output[:len(targets)], targets) 
         return loss.data[0]
