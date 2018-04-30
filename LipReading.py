@@ -65,36 +65,25 @@ class EncoderRNN(nn.Module):
 
     def CNN(self, x):
         # 1
-        # print(x.shape)
+        
         x = F.relu(self.conv1(x))
-        # print(x.shape)
         x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
-        # print(x.shape)
-        # print("mean=",x.mean())
         x = self.batchNorm1(x)
-        # print("mean=",x.mean())
-        # print("first layer finish")
         # 2
         x = F.relu(self.conv2(x))
-        #  print(x.shape)
         x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
-        #  print(x.shape)
         x = self.batchNorm2(x)
 
         # 3
         x = F.relu(self.conv3(x))
-        # print(x.shape)
-
+        
         # 4
         x = F.relu(self.conv4(x))
-        # print(x.shape)
-
+        
         # 5
         x = F.relu(self.conv5(x))
-        # print(x.shape)
         x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
-        # print(x.shape)
-
+        
         # 6
         x = x.view(x.shape[0],32768)
         x = self.fc6(x)  # должна ли быть функция актвации для последнего слоя?
@@ -123,7 +112,7 @@ class DecoderRNN(nn.Module):
         self.MLP_hidden_size = 256
         self.MLP_fc1 = nn.Linear(2*self.MLP_hidden_size,self.MLP_hidden_size)        
         self.MLP_fc2 = nn.Linear(self.MLP_hidden_size,self.MLP_hidden_size)        
-        self.MLP_fc3=nn.Linear(self.MLP_hidden_size,self.MLP_hidden_size)
+        self.MLP_fc3=nn.Linear(self.MLP_hidden_size,47)
         
     def forward(self,Y,h,c, outEncoder):# Y это кол-во символов умножить на 256
         h = torch.squeeze(h,0).cuda()
@@ -144,23 +133,24 @@ class DecoderRNN(nn.Module):
         h = torch.squeeze(h,0)
         c = torch.squeeze(c,0)
         max_len = 30
-        result = Variable(torch.FloatTensor(max_len,1,47).zero_()).cuda()
-        Y_cur = torch.FloatTensor(1,47).zero_().cuda()
+        result = Variable(torch.FloatTensor(max_len,1,self.hidden_size).zero_()).cuda()
+        Y_cur = torch.FloatTensor(1,self.hidden_size).zero_().cuda()
         alphabet = Alphabet()
-        Y_cur[0][alphabet.ch2index('<sos>')] = 1.0
+        Y_cur[0]=self.embedding(alphabet.ch2index('<sos>'))
         Y_cur=Variable(Y_cur)
-        for  i in range(max_len):
+        result[0][0]=self.embedding(alphabet.ch2index('<sos>'))
+        for  i in range(max_len-1):
+            j=i+1
             h,cLSTM = self.lstm1(Y_cur,(h,c))
             c = self.attention(h, outEncoder)
 #            c = torch.mm( torch.unsqueeze(c,torch.squeeze(self.outEncoder,1) )
             c = torch.mm(c,outEncoder)
             char = self.MLP( torch.cat( (cLSTM,c),1 ) )
-            result[i] = char
-            Y_cur= char
+            result[j] = char
+            Y_cur= char  
             argmax = torch.max(Y_cur.data[0],dim=0)
-            argmax=argmax[1]            
             if argmax[0] == alphabet.ch2index('<eos>'):
-                max_len=i+1
+                max_len=j+1
                 break
 #            print(output_decoder.shape)
         return result[:max_len]        
@@ -228,18 +218,11 @@ class DecoderRNN(nn.Module):
 #decoder.attention(hidden,out)
    
 #%%
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.autograd import Variable
-torch.manual_seed(1)
-word_to_ix = {"hello": 0, "world": 1}
-embeds = nn.Embedding(10, 6)  # 2 words in vocab, 5 dimensional embeddings
-input = Variable(torch.LongTensor([[1,5,4,3,2]]))
-input2 = Variable(torch.LongTensor([[1,5,4,3,2]]))
-
-hello_embed = embeds(input)
-hello_embed2 = embeds(input2)
-print(hello_embed)
-print(hello_embed2)
+#
+#loss = nn.CrossEntropyLoss()
+#input = Variable(torch.FloatTensor([[99, 0], [99,0]]))
+#
+#print(input)
+#target = Variable(torch.LongTensor([0, 1]))
+#output = loss(input, target)
+#print(output)

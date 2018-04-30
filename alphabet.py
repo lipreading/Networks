@@ -54,6 +54,4 @@ class Alphabet:
     def ch2index(self, ch):
         return self.alph_dict.get(ch)
 
-#%%
-alphabet = Alphabet()
-print(alphabet.ch2index('ы'))        
+#%% 
