@@ -145,11 +145,13 @@ class DecoderRNN(nn.Module):
         Y_cur = self.embedding( Variable(torch.LongTensor([alphabet.ch2index('<sos>')]).cuda()) ).view(1,self.hidden_size)
         for  i in range(max_len-1):
             j=i+1
-            h,cLSTM = self.lstm1(Y_cur,(h,c))
-            c = self.attention(h, outEncoder)
+            h[0],c[0] = self.lstm1(Y_cur,(h[0],c[0]))
+            h[1],c[1] = self.lstm2(h[0],(h[1],c[1]))
+            h[2],c[2] = self.lstm3(h[1],(h[2],c[2]))
+            context = self.attention(h, outEncoder)
 #            c = torch.mm( torch.unsqueeze(c,torch.squeeze(self.outEncoder,1) )
-            c = torch.mm(c,outEncoder)
-            char = self.MLP( torch.cat( (cLSTM,c),1 ) )
+            context = torch.mm(context,outEncoder)
+            char = self.MLP( Storch.cat( (h[2],context),1 ) )
            # print(char.data[0])
             result[j] = char.data
             argmax = torch.max(result[j][0],dim=0)
