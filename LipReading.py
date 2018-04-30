@@ -24,7 +24,7 @@ class EncoderRNN(nn.Module):
         # batch norm for CNN
         self.batchNorm1 = nn.BatchNorm2d(96)
         self.batchNorm2 = nn.BatchNorm2d(256)
-        self.lstm1=nn.LSTM(512,self.hidden_size,num_layers=1)
+        self.lstm1=nn.LSTM(512,self.hidden_size,num_layers=3)
 #        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
 #        self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)       
         
@@ -50,18 +50,13 @@ class EncoderRNN(nn.Module):
     #        return output,hidden
     #
     def RNN(self, input,h,c):  # input.shape= seq_len*512
-       #a hidden = self.initHidden()
         input = torch.unsqueeze(input, 1).cuda()
-        # print(input.shape)
-        # print(input)
         output, hidden = self.lstm1(input,(h,c))
-        # print("outRNN", output.shape)
-        # print("hiddenRNN", hidden[0].shape)
         return output, hidden
 
-    def initHidden(self):
-        return (torch.autograd.Variable(torch.randn(1, 1, self.hidden_size).cuda()),
-                torch.autograd.Variable(torch.randn((1, 1, self.hidden_size)).cuda()))
+#    def initHidden(self):
+#        return (torch.autograd.Variable(torch.randn(1, 1, self.hidden_size).cuda()),
+#                torch.autograd.Variable(torch.randn((1, 1, self.hidden_size)).cuda()))
 
     def CNN(self, x):
         # 1
@@ -98,7 +93,9 @@ class DecoderRNN(nn.Module):
         # LSTM
         self.hidden_size=256
         self.embedding = nn.Embedding(47, self.hidden_size)
-        self.lstm1=nn.LSTMCell(self.hidden_size,self.hidden_size) #кол-во букв в русском алфавите = 33 и еще + 3.
+        self.lstm1=nn.LSTMCell(self.hidden_size,self.hidden_size) 
+        self.lstm2=nn.LSTMCell(self.hidden_size,self.hidden_size) 
+        self.lstm3=nn.LSTMCell(self.hidden_size,self.hidden_size) 
 #        attention
         self.att_fc1=nn.Linear(self.hidden_size,self.hidden_size)
         self.att_fc2=nn.Linear(self.hidden_size,self.hidden_size)
@@ -115,20 +112,27 @@ class DecoderRNN(nn.Module):
         self.MLP_fc3=nn.Linear(self.MLP_hidden_size,47)
         
     def forward(self,Y,h,c, outEncoder,teacher_force):# Y это кол-во символов умножить на 256
-        h = torch.squeeze(h,0).cuda()
-        c = torch.squeeze(c,0).cuda()
-        output_decoder= torch.autograd.Variable(torch.zeros(Y.shape[0], 1, 47)).cuda()
+        h = h.cuda()
+        c = c.cuda()
+        output_decoder= torch.autograd.Variable(torch.zeros(Y.shape[0]-1, 1, 47)).cuda()
         Y = self.embedding(Y).view(Y.shape[0], 1, self.hidden_size)
         
         for  i in range(len(Y)-1): # -1 так как sos не учитывем в criterion
             if ((np.random.rand()>teacher_force)or(i==0)):
-                h,cLSTM = self.lstm1(Y[i],(h,c))
+                h[0],c[0] = self.lstm1(Y[i],(h[0],c[0]))
+                h[1],c[1] = self.lstm2(h[0],(h[1],c[1]))
+                h[2],c[2] = self.lstm3(h[1],(h[2],c[2]))
             else:
-                print("NOT REAL TARGET")
-                h,cLSTM=self.lstm1(output_decoder[i-1],(h,c))
-            c = self.attention(h, outEncoder)
-            c = torch.mm(c,outEncoder).cuda()
-            output_decoder[i] = self.MLP( torch.cat( (cLSTM,c),1 ) )
+               # print("NOT REAL TARGET")
+                argmax = torch.max(output_decoder[i-1][0],dim=0)
+                indMax=(argmax[1][0]).cuda()
+                inputs = self.embedding(indMax).view(1, self.hidden_size)
+                h[0],c[0]=self.lstm1(inputs,(h[0],c[0]))
+                h[1],c[1]=self.lstm2(h[0],(h[1],c[1]))
+                h[2],c[2]=self.lstm3(h[1],(h[2],c[2]))
+            context = self.attention(h[2], outEncoder)
+            context = torch.mm(context,outEncoder).cuda()
+            output_decoder[i] = self.MLP( torch.cat( (h[2],context),1 ) )
         return output_decoder.cuda()
     
     def evaluate(self,h,c,outEncoder): # sos в return быть не должно
@@ -152,7 +156,7 @@ class DecoderRNN(nn.Module):
             #print(result[j][0])
             listArgmax.append(argmax[1][0])
             if argmax[1][0] == alphabet.ch2index('<eos>'):
-               print("BREAK EVAL",argmax[1][0]) 
+               #print("BREAK EVAL",argmax[1][0]) 
                max_len=j+1
                break
             Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0]]).cuda()) ).view(1,self.hidden_size)
