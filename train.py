@@ -23,9 +23,11 @@ def to_var(x, volatile=False):
     return Variable(x, volatile=volatile)
 
 def get_word(seq): # seq-числа
+    #print(seq)
     alphabet=Alphabet()
     s=""
     for el in seq:
+        #print("el:",el.data)
         s+=alphabet.index2ch(el)
     return s
 def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda,teacher_force):
@@ -46,7 +48,7 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
        
     encoder_output, encoder_hidden = encoder(frames,h0,c0)
     encoder_output = torch.squeeze(encoder_output,1)
-    print(encoder_hidden[0].shape)
+    #print(encoder_hidden[0].shape)
     decoder_output = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
     
     decoder_output = torch.squeeze(decoder_output,1).cuda()
@@ -106,16 +108,16 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                 with open('log/testLoss.txt', 'a') as f:
                	     s = 'epoch=' + str(epoch) +' i=' + str(i) + 'test_loss=' +str(test_loss)+'\n'
                      f.write(s)            
-            if epoch<=5:
+            if epoch<=10:
                 teacher_force=0.0
             else:
-                if epoch<=20:
+                if epoch<=25:
                     teacher_force=0.2
                 else:
                     if epoch<=50:
-                        teacher_force=0.5
+                        teacher_force=0.3
                     else:
-                        teacher_force=1.0                        
+                        teacher_force=0.5                        
             loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda,teacher_force)
            # print("finished words:",i+1)
            #print("train_loss",loss)
@@ -157,12 +159,18 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
  #   print(decoder_output.shape)
     decoder_output=Variable(decoder_output)
     targets=targets[1:]# убираем sos
-    res_exp=get_word(targets[:len(targets)-1])#записываем без eos
-    res=get_word(decoder_output[:len(decoder_output)-1])
+    res_exp=get_word(targets[:len(targets)-1].data)#записываем без eos
+    seq=torch.LongTensor(decoder_output.shape[0]-1).cuda()
+    for i in range(len(seq)):
+        argmax = torch.max(decoder_output[i][0],dim=0)
+        # print(seq[i])
+        # print(argmax[1][0].data)
+        seq[i]=argmax[1][0].data[0]
+    res=get_word(seq)
     print("exp:",res_exp)
-    print("res:",res)
+   # print("res:",res)
     with open('log/result.txt', 'a') as f:
-        f.write("exp:"+res_exp+'\t'+"res:"+res)      
+        f.write("exp:"+res_exp+'\n')      
     if len(targets)<=len(decoder_output):
         loss = criterion(decoder_output[:len(targets)], targets) 
         return loss.data[0]
@@ -188,15 +196,4 @@ train_iters(encoder, decoder, use_cuda)
 save_model(encoder, decoder)
 
 #%%
-from alphabet import Alphabet
-import torch
-
-def get_word(seq): # seq-числа
-    alphabet=Alphabet()
-    s=""
-    for el in seq:
-        s+=alphabet.index2ch(el)
-    return s
-ten=torch.LongTensor([2,5,1,3,6,9])
-print(get_word(ten))
 

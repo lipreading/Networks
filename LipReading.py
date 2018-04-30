@@ -7,6 +7,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from alphabet import Alphabet
+
+
+def get_word(seq): # seq-числа
+    #print(seq)
+    alphabet=Alphabet()
+    s=""
+    if len(seq)==0:
+        return s
+    for el in seq:
+        #print("el:",el.data)
+        if(el!=34):#хардкод
+               s+=alphabet.index2ch(el)
+    return s
+
 class EncoderRNN(nn.Module):
 
     def __init__(self):
@@ -111,33 +125,33 @@ class DecoderRNN(nn.Module):
         self.MLP_fc2 = nn.Linear(self.MLP_hidden_size,self.MLP_hidden_size)        
         self.MLP_fc3=nn.Linear(self.MLP_hidden_size,47)
         
-    def forward(self,Y,h,c, outEncoder,teacher_force):# Y это кол-во символов умножить на 256
-        h = h.cuda()
-        c = c.cuda()
+    def forward(self,Y,h0,c0, outEncoder,teacher_force):# Y это кол-во символов умножить на 256
+        h = h0.clone().cuda()
+        c = c0.clone().cuda()
         output_decoder= torch.autograd.Variable(torch.zeros(Y.shape[0]-1, 1, 47)).cuda()
         Y = self.embedding(Y).view(Y.shape[0], 1, self.hidden_size)
         
         for  i in range(len(Y)-1): # -1 так как sos не учитывем в criterion
             if ((np.random.rand()>teacher_force)or(i==0)):
-                h[0],c[0] = self.lstm1(Y[i],(h[0],c[0]))
-                h[1],c[1] = self.lstm2(h[0],(h[1],c[1]))
-                h[2],c[2] = self.lstm3(h[1],(h[2],c[2]))
+                h[0],c[0] = self.lstm1(Y[i],(h[0].clone(),c[0].clone()))
+                h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
+                h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
             else:
                # print("NOT REAL TARGET")
                 argmax = torch.max(output_decoder[i-1][0],dim=0)
                 indMax=(argmax[1][0]).cuda()
                 inputs = self.embedding(indMax).view(1, self.hidden_size)
-                h[0],c[0]=self.lstm1(inputs,(h[0],c[0]))
-                h[1],c[1]=self.lstm2(h[0],(h[1],c[1]))
-                h[2],c[2]=self.lstm3(h[1],(h[2],c[2]))
-            context = self.attention(h[2], outEncoder)
+                h[0],c[0]=self.lstm1(inputs.clone(),(h[0].clone(),c[0].clone()))
+                h[1],c[1]=self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
+                h[2],c[2]=self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
+            context = self.attention(h[2].clone(), outEncoder)
             context = torch.mm(context,outEncoder).cuda()
-            output_decoder[i] = self.MLP( torch.cat( (h[2],context),1 ) )
+            output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),context),1 ) )
         return output_decoder.cuda()
     
-    def evaluate(self,h,c,outEncoder): # sos в return быть не должно
-        h = torch.squeeze(h,0)
-        c = torch.squeeze(c,0)
+    def evaluate(self,h0,c0,outEncoder): # sos в return быть не должно
+        h = torch.squeeze(h0.clone(),0).cuda()
+        c = torch.squeeze(c0.clone(),0).cuda()
         max_len = 20
         result = torch.FloatTensor(max_len,1,47).zero_().cuda()
         alphabet = Alphabet()
@@ -148,10 +162,10 @@ class DecoderRNN(nn.Module):
             h[0],c[0] = self.lstm1(Y_cur,(h[0],c[0]))
             h[1],c[1] = self.lstm2(h[0],(h[1],c[1]))
             h[2],c[2] = self.lstm3(h[1],(h[2],c[2]))
-            context = self.attention(h, outEncoder)
+            context = self.attention(h[2], outEncoder)
 #            c = torch.mm( torch.unsqueeze(c,torch.squeeze(self.outEncoder,1) )
             context = torch.mm(context,outEncoder)
-            char = self.MLP( Storch.cat( (h[2],context),1 ) )
+            char = self.MLP( torch.cat( (h[2],context),1 ) )
            # print(char.data[0])
             result[j] = char.data
             argmax = torch.max(result[j][0],dim=0)
@@ -163,7 +177,10 @@ class DecoderRNN(nn.Module):
                break
             Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0]]).cuda()) ).view(1,self.hidden_size)
 #            print(output_decoder.shape)
-        print("chars",listArgmax)
+        word=get_word(torch.LongTensor(listArgmax))
+        print("res:",word)
+        with open('log/result.txt', 'a') as f:
+                 f.write("res:"+word+'\n')
         return result[:max_len]        
  
     
