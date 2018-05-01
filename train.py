@@ -13,14 +13,15 @@ import torch
 from LipReading import EncoderRNN, DecoderRNN
 from config import *
 from data_loader import get_loader
-from utilities import save_model
+from utilities import save_model, load_to_cuda
 from alphabet import Alphabet
 
 
 def to_var(x, volatile=False):
     if cuda.is_available():
         x = x.cuda()
-    return Variable(x, volatile=volatile)
+    return Variable(x)
+
 
 def get_word(seq): # seq-числа
     #print(seq)
@@ -30,7 +31,9 @@ def get_word(seq): # seq-числа
         #print("el:",el.data)
         s+=alphabet.index2ch(el)
     return s
-def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda,teacher_force):
+
+
+def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, teacher_force):
 
     #encoder_hidden = encoder.initHidden()
 
@@ -43,20 +46,20 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
     # input_length = frames.size()[0]
     # target_length = targets_for_training.size()[0]
     #print("frames",frames.shape)
-    h0 = Variable(torch.zeros(3, 1, encoder.hidden_size)).cuda()
-    c0 = Variable(torch.zeros(3, 1, encoder.hidden_size)).cuda()
+    h0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
+    c0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
        
     encoder_output, encoder_hidden = encoder(frames,h0,c0)
     encoder_output = torch.squeeze(encoder_output,1)
     #print(encoder_hidden[0].shape)
     decoder_output = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
     
-    decoder_output = torch.squeeze(decoder_output,1).cuda()
+    decoder_output = load_to_cuda(torch.squeeze(decoder_output,1))
 #    print(targets.shape)
 #    targets = torch.squeeze(targets,1)
     # print(targets)
     targets=targets[1:]# убираем sos
-    loss = criterion(decoder_output.cuda(), targets.cuda())
+    loss = criterion(load_to_cuda(decoder_output), load_to_cuda(targets))
 
     # print(loss.data[0])
     loss.backward()
@@ -66,7 +69,7 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
     return loss.data[0]
 
 
-def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
+def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
                 print_every=10, plot_every=10, learning_rate=LEARNING_RATE):
 
     print('ITERATIONS: {}, BATCH SIZE: {}, LEARNING RATE: {}'
@@ -79,7 +82,7 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = load_to_cuda(nn.CrossEntropyLoss())
 
     # Загружаем данные - в итоге получаем объект типа torch.utils.data.Dataloader,
     data_loader = get_loader()
@@ -103,7 +106,7 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
             # print('targets: ', targets.shape)
             # print('frames: ', frames.shape)
             if i%100==0:
-                test_loss = evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
+                test_loss = evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
                 print("test_loss",test_loss)
                 with open('log/testLoss.txt', 'a') as f:
                	     s = 'epoch=' + str(epoch) +' i=' + str(i) + 'test_loss=' +str(test_loss)+'\n'
@@ -118,7 +121,7 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                         teacher_force=0.3
                     else:
                         teacher_force=0.5                        
-            loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda,teacher_force)
+            loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, teacher_force)
            # print("finished words:",i+1)
            #print("train_loss",loss)
             with open('log/trainLoss.txt', 'a') as f:
@@ -139,11 +142,11 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
 
  #   show_plot(plot_losses)
 
-def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda):
+def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion):
 
    # encoder_hidden = encoder.initHidden()
-    h0 = Variable(torch.zeros(3, 1, encoder.hidden_size)).cuda()
-    c0 = Variable(torch.zeros(3, 1, encoder.hidden_size)).cuda()
+    h0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
+    c0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
 
     
     frames = frames.float()
@@ -160,7 +163,7 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
     decoder_output=Variable(decoder_output)
     targets=targets[1:]# убираем sos
     res_exp=get_word(targets[:len(targets)-1].data)#записываем без eos
-    seq=torch.LongTensor(decoder_output.shape[0]-1).cuda()
+    seq=load_to_cuda(torch.LongTensor(decoder_output.shape[0]-1))
     for i in range(len(seq)):
         argmax = torch.max(decoder_output[i][0],dim=0)
         # print(seq[i])
@@ -178,20 +181,17 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
         loss = criterion(decoder_output, targets[:len(decoder_output)])
         return loss.data[0]   
 
-use_cuda = False
+
 if cuda.is_available():
     print('cuda is available!')
-    use_cuda = True
 
 # Build the model
 encoder = EncoderRNN()
 decoder = DecoderRNN()
 if cuda.is_available():
-    print('cuda is available!')
-    use_cuda = True
     encoder.cuda()
     decoder.cuda()
-train_iters(encoder, decoder, use_cuda)
+train_iters(encoder, decoder)
 
 save_model(encoder, decoder)
 

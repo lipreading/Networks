@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from alphabet import Alphabet
+from utilities import load_to_cuda
 
 
 def get_word(seq): # seq-числа
@@ -20,6 +21,7 @@ def get_word(seq): # seq-числа
         if(el!=34):#хардкод
                s+=alphabet.index2ch(el)
     return s
+
 
 class EncoderRNN(nn.Module):
 
@@ -48,7 +50,7 @@ class EncoderRNN(nn.Module):
         CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_()) # то есть первый параметр это seq_len; второй выход CNN
         
         CNN_out=self.CNN(input)
-        return self.RNN(CNN_out.cuda(),h,c)
+        return self.RNN(load_to_cuda(CNN_out),h,c)
 
     #        out = self.CNN(input)
     #        print("finish CNN:", out.shape)
@@ -64,13 +66,13 @@ class EncoderRNN(nn.Module):
     #        return output,hidden
     #
     def RNN(self, input,h,c):  # input.shape= seq_len*512
-        input = torch.unsqueeze(input, 1).cuda()
+        input = load_to_cuda(torch.unsqueeze(input, 1))
         output, hidden = self.lstm1(input,(h,c))
         return output, hidden
 
 #    def initHidden(self):
-#        return (torch.autograd.Variable(torch.randn(1, 1, self.hidden_size).cuda()),
-#                torch.autograd.Variable(torch.randn((1, 1, self.hidden_size)).cuda()))
+#        return (torch.autograd.Variable(load_to_cuda(torch.randn(1, 1, self.hidden_size))),
+#                torch.autograd.Variable(load_to_cuda(torch.randn((1, 1, self.hidden_size)))))
 
     def CNN(self, x):
         # 1
@@ -114,10 +116,10 @@ class DecoderRNN(nn.Module):
         self.att_fc1=nn.Linear(self.hidden_size,self.hidden_size)
         self.att_fc2=nn.Linear(self.hidden_size,self.hidden_size)
         self.att_fc3=nn.Linear(self.hidden_size,self.hidden_size)
-        self.att_vector = Variable(torch.randn(1,self.hidden_size),requires_grad=True).cuda()
-        self.att_W = Variable(torch.randn(self.hidden_size,self.hidden_size), requires_grad=True).cuda()
-        self.att_V = Variable(torch.randn(self.hidden_size,self.hidden_size), requires_grad=True).cuda()
-        self.att_b = Variable(torch.randn(self.hidden_size,1), requires_grad=True).cuda()
+        self.att_vector = load_to_cuda(Variable(torch.randn(1,self.hidden_size),requires_grad=True))
+        self.att_W = load_to_cuda(Variable(torch.randn(self.hidden_size,self.hidden_size), requires_grad=True))
+        self.att_V = load_to_cuda(Variable(torch.randn(self.hidden_size,self.hidden_size), requires_grad=True))
+        self.att_b = load_to_cuda(Variable(torch.randn(self.hidden_size,1), requires_grad=True))
         
         #MLP
         self.MLP_hidden_size = 256
@@ -126,9 +128,9 @@ class DecoderRNN(nn.Module):
         self.MLP_fc3=nn.Linear(self.MLP_hidden_size,47)
         
     def forward(self,Y,h0,c0, outEncoder,teacher_force):# Y это кол-во символов умножить на 256
-        h = h0.clone().cuda()
-        c = c0.clone().cuda()
-        output_decoder= torch.autograd.Variable(torch.zeros(Y.shape[0]-1, 1, 47)).cuda()
+        h = load_to_cuda(h0.clone())
+        c = load_to_cuda(c0.clone())
+        output_decoder = load_to_cuda(torch.autograd.Variable(torch.zeros(Y.shape[0]-1, 1, 47)))
         Y = self.embedding(Y).view(Y.shape[0], 1, self.hidden_size)
         
         for  i in range(len(Y)-1): # -1 так как sos не учитывем в criterion
@@ -139,24 +141,24 @@ class DecoderRNN(nn.Module):
             else:
                # print("NOT REAL TARGET")
                 argmax = torch.max(output_decoder[i-1][0],dim=0)
-                indMax=(argmax[1][0]).cuda()
+                indMax=load_to_cuda((argmax[1][0]))
                 inputs = self.embedding(indMax).view(1, self.hidden_size)
                 h[0],c[0]=self.lstm1(inputs.clone(),(h[0].clone(),c[0].clone()))
                 h[1],c[1]=self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
                 h[2],c[2]=self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
             context = self.attention(h[2].clone(), outEncoder)
-            context = torch.mm(context,outEncoder).cuda()
+            context = load_to_cuda(torch.mm(context,outEncoder))
             output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),context),1 ) )
-        return output_decoder.cuda()
+        return load_to_cuda(output_decoder)
     
     def evaluate(self,h0,c0,outEncoder): # sos в return быть не должно
-        h = torch.squeeze(h0.clone(),0).cuda()
-        c = torch.squeeze(c0.clone(),0).cuda()
+        h = load_to_cuda(torch.squeeze(h0.clone(),0))
+        c = load_to_cuda(torch.squeeze(c0.clone(),0))
         max_len = 20
-        result = torch.FloatTensor(max_len,1,47).zero_().cuda()
+        result = load_to_cuda(torch.FloatTensor(max_len,1,47).zero_())
         alphabet = Alphabet()
         listArgmax=[]# буквы, которые выдал
-        Y_cur = self.embedding( Variable(torch.LongTensor([alphabet.ch2index('<sos>')]).cuda()) ).view(1,self.hidden_size)
+        Y_cur = self.embedding( Variable(load_to_cuda(torch.LongTensor([alphabet.ch2index('<sos>')]))) ).view(1,self.hidden_size)
         for  i in range(max_len-1):
             j=i+1
             h[0],c[0] = self.lstm1(Y_cur,(h[0],c[0]))
@@ -175,7 +177,7 @@ class DecoderRNN(nn.Module):
                #print("BREAK EVAL",argmax[1][0]) 
                max_len=j+1
                break
-            Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0]]).cuda()) ).view(1,self.hidden_size)
+            Y_cur=self.embedding( Variable(load_to_cuda(torch.LongTensor([argmax[1][0]]))) ).view(1,self.hidden_size)
 #            print(output_decoder.shape)
         word=get_word(torch.LongTensor(listArgmax))
         print("res:",word)
