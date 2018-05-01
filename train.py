@@ -62,15 +62,16 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
     encoder_output, encoder_hidden = encoder(frames,h0,c0)
     encoder_output = torch.squeeze(encoder_output,1)
     #print(encoder_hidden[0].shape)
-    decoder_output = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
+    decoder_output,true_len = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
     
     decoder_output = torch.squeeze(decoder_output,1).cuda()
 #    print(targets.shape)
 #    targets = torch.squeeze(targets,1)
     # print(targets)
     targets=targets[1:]# убираем sos
+    print("Len",len(targets),len(decoder_output))
     loss = get_loss(decoder_output.cuda(), targets.cuda(),criterion)
-
+   
     # print(loss.data[0])
     loss.backward()
     encoder_optimizer.step()
@@ -86,16 +87,8 @@ def get_loss(decoder_output,targets, criterion):
            compTarg =completeNull(targets,len(targets),len(decoder_output))
            return criterion(decoder_output,compTarg)
         else:
-            compDec=torch.FloatTensor(len(targets),48).zero_().cuda()
-            for i in range(len(decoder_output)):
-                compDec[i]=decoder_output[i]
-            j=len(decoder_output)
-            while j<len(targets):
-                alphabet=Alphabet()
-                compDec[j][alphabet.ch2index('null')]=1.0
-                j+=1
-            return criterion(compDec,targets)
-
+            assert False,"len target > len decoder_output"
+        
 def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                 print_every=10, plot_every=10, learning_rate=LEARNING_RATE):
 
@@ -132,13 +125,6 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
             #targets_for_training = targets_for_training.view(-1, 1, 48)
             # print('targets: ', targets.shape)
             # print('frames: ', frames.shape)
-            if i%100==0:
-                test_loss = evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
-                print("test_loss",test_loss)
-                total_test_loss+=test_loss
-                with open('log2/testLoss.txt', 'a') as f:
-               	     s = 'epoch=' + str(epoch) +' i=' + str(i) + 'test_loss=' +str(test_loss)+'\n'
-                     f.write(s)            
             if epoch<=100:
                 teacher_force=0.0
             else:
@@ -171,7 +157,19 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
 
         plot_losses.append(plot_loss_total/words_amount)
         plot_loss_total = 0
-
+        
+        print(evaluate)
+        print(len(data_loader))
+        for i, (frames, targets, is_valid) in enumerate(data_loader):
+            if not is_valid[0]:
+                continue
+            test_loss = evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
+            print("test_loss",test_loss)
+            total_test_loss+=test_loss
+            with open('log2/testLoss.txt', 'a') as f:
+                s = 'epoch=' + str(epoch) +' i=' + str(i) + 'test_loss=' +str(test_loss)+'\n'
+                f.write(s)            
+            i+=100
  #   show_plot(plot_losses)
 
 def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda):
@@ -188,7 +186,7 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
     encoder_output, encoder_hidden = encoder(frames,h0,c0)
     encoder_output = torch.squeeze(encoder_output,1)
 
-    decoder_output = decoder.evaluate(encoder_hidden[0],encoder_hidden[1],encoder_output)    
+    decoder_output,true_len = decoder.evaluate(encoder_hidden[0],encoder_hidden[1],encoder_output)    
     decoder_output = torch.squeeze(decoder_output,1)
  #   print(targets.shape)
  #   print(decoder_output.shape)
@@ -196,17 +194,17 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
     targets=targets[1:]# убираем sos
     res_exp=get_word(targets[:len(targets)-1].data)#записываем без eos
     seq=torch.LongTensor(decoder_output.shape[0]-1).cuda()
-    for i in range(len(seq)):
-        argmax = torch.max(decoder_output[i][0],dim=0)
-        # print(seq[i])
-        # print(argmax[1][0].data)
-        seq[i]=argmax[1][0].data[0]
-    res=get_word(seq)
+#    for i in range(len(seq)):
+#        argmax = torch.max(decoder_output[i][0],dim=0)
+#        # print(seq[i])
+#        # print(argmax[1][0].data)
+#        seq[i]=argmax[1][0].data[0]
+#    res=get_word(seq)
     print("exp:",res_exp)
    # print("res:",res)
     with open('log2/result.txt', 'a') as f:
         f.write("exp:"+res_exp+'\n')      
-    
+    loss = criterion(decoder_output[:len(targets)],targets)
     loss = get_loss(decoder_output.cuda(), targets.cuda(),criterion)
     return loss.data[0]
 use_cuda = False

@@ -128,36 +128,49 @@ class DecoderRNN(nn.Module):
     def forward(self,Y,h0,c0, outEncoder,teacher_force):# Y это кол-во символов умножить на 256
         h = h0.clone().cuda()
         c = c0.clone().cuda()
-        output_decoder= torch.autograd.Variable(torch.zeros(Y.shape[0]-1, 1, 48)).cuda()
-        Y = self.embedding(Y).view(Y.shape[0], 1, self.hidden_size)
         
-        for  i in range(len(Y)-1): # -1 так как sos не учитывем в criterion
-            if ((np.random.rand()>teacher_force)or(i==0)):
+        if (np.random.rand()>teacher_force):
+            seq_len=Y.shape[0]-1
+            output_decoder= torch.autograd.Variable(torch.zeros(Y.shape[0]-1, 1, 48)).cuda()
+            Y = self.embedding(Y).view(Y.shape[0], 1, self.hidden_size)
+            for  i in range(len(Y)-1): # -1 так как sos не учитывем в criterion
                 h[0],c[0] = self.lstm1(Y[i],(h[0].clone(),c[0].clone()))
                 h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
                 h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
-            else:
-               # print("NOT REAL TARGET")
-                argmax = torch.max(output_decoder[i-1][0],dim=0)
-                indMax=(argmax[1][0]).cuda()
-                inputs = self.embedding(indMax).view(1, self.hidden_size)
-                h[0],c[0]=self.lstm1(inputs.clone(),(h[0].clone(),c[0].clone()))
-                h[1],c[1]=self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
-                h[2],c[2]=self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
-            context = self.attention(h[2].clone(), outEncoder)
-            context = torch.mm(context,outEncoder).cuda()
-            output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),context),1 ) )
-        return output_decoder.cuda()
-    
+                c[2] = self.attention(h[2].clone(), outEncoder)
+                c[2] = torch.mm(c[2],outEncoder).cuda()
+                output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),c[2]),1 ) )
+        else:
+            seq_len = 20# максимальная длина
+            output_decoder= torch.autograd.Variable(torch.zeros(seq_len, 1, 48)).cuda()   
+            alphabet = Alphabet()
+            Y_cur = self.embedding( Variable(torch.LongTensor([alphabet.ch2index('<sos>')]).cuda()) ).view(1,self.hidden_size)
+            for  i in range(seq_len-1):
+                j=i+1
+                h[0],c[0] = self.lstm1(Y_cur,(h[0],c[0]))
+                h[1],c[1] = self.lstm2(h[0],(h[1],c[1]))
+                h[2],c[2] = self.lstm3(h[1],(h[2],c[2]))
+                context = self.attention(h[2], outEncoder)
+                context = torch.mm(context,outEncoder)
+                char = self.MLP( torch.cat( (h[2],context),1 ) )
+                output_decoder[j] = char.clone()
+                argmax = torch.max(output_decoder[j][0],dim=0)
+                if argmax[1][0] == alphabet.ch2index('<eos>'):
+                    seq_len=j+1
+                    break
+                Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0]]).cuda()) ).view(1,self.hidden_size)
+        return output_decoder,seq_len 
+        
+        
     def evaluate(self,h0,c0,outEncoder): # sos в return быть не должно
         h = torch.squeeze(h0.clone(),0).cuda()
         c = torch.squeeze(c0.clone(),0).cuda()
-        max_len = 20
-        result = torch.FloatTensor(max_len,1,48).zero_().cuda()
+        seq_len = 20# максимальная длина
+        result = torch.FloatTensor(seq_len,1,48).zero_().cuda()
         alphabet = Alphabet()
         listArgmax=[]# буквы, которые выдал
         Y_cur = self.embedding( Variable(torch.LongTensor([alphabet.ch2index('<sos>')]).cuda()) ).view(1,self.hidden_size)
-        for  i in range(max_len-1):
+        for  i in range(seq_len-1):
             j=i+1
             h[0],c[0] = self.lstm1(Y_cur,(h[0],c[0]))
             h[1],c[1] = self.lstm2(h[0],(h[1],c[1]))
@@ -173,7 +186,7 @@ class DecoderRNN(nn.Module):
             listArgmax.append(argmax[1][0])
             if argmax[1][0] == alphabet.ch2index('<eos>'):
                #print("BREAK EVAL",argmax[1][0]) 
-               max_len=j+1
+               seq_len=j+1
                break
             Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0]]).cuda()) ).view(1,self.hidden_size)
 #            print(output_decoder.shape)
@@ -181,7 +194,7 @@ class DecoderRNN(nn.Module):
         print("res:",word)
         with open('log2/result.txt', 'a') as f:
                  f.write("res:"+word+'\n')
-        return result[:max_len]        
+        return result,seq_len        
  
     
     def MLP(self,v):
