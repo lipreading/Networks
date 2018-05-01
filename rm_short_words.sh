@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-FRAME_DIR='test_frames'
+FRAME_DIR='test_frames'  # работает для ВСЕГО датасета, то есть это папка с разными видео
 
 let border=4  # граница отсева коротких слов
 
