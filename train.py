@@ -19,13 +19,13 @@ from alphabet import Alphabet
 
 def completeNull(v,v_size,out_size):#v_size - размерность вектора, out_size - необходимая размерность
     alphabet=Alphabet()
-    newv = torch.LongTensor(out_size).cuda()
+    newv = Variable(torch.LongTensor(out_size).zero_().cuda())
     for i in range(v_size):
-       newv[i]=v[i]
-    j=v_size
-    while j<out_size:
-        newv[j]=alphabet.ch2index('null')
-        j+=1
+         newv[i]=v[i].clone()
+ #   j=v_size
+  #  while j<out_size:
+  #      newv[j]=alphabet.ch2index('null')
+  #      j+=1
     return newv    
 
 def to_var(x, volatile=False):
@@ -69,7 +69,7 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
 #    targets = torch.squeeze(targets,1)
     # print(targets)
     targets=targets[1:]# убираем sos
-    print("Len",len(targets),len(decoder_output))
+   # print("Len",len(targets),len(decoder_output))
     loss = get_loss(decoder_output.cuda(), targets.cuda(),criterion)
    
     # print(loss.data[0])
@@ -84,7 +84,7 @@ def get_loss(decoder_output,targets, criterion):
         return criterion(decoder_output,targets)
     else:
         if len(targets)<len(decoder_output):
-           compTarg =completeNull(targets,len(targets),len(decoder_output))
+           compTarg =completeNull(targets,len(targets),len(decoder_output)).clone()
            return criterion(decoder_output,compTarg)
         else:
             assert False,"len target > len decoder_output"
@@ -125,8 +125,8 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
             #targets_for_training = targets_for_training.view(-1, 1, 48)
             # print('targets: ', targets.shape)
             # print('frames: ', frames.shape)
-            if epoch<=100:
-                teacher_force=0.0
+            if epoch<=300:
+                teacher_force=0.5
             else:
                 if epoch<=200:
                     teacher_force=0.15
@@ -160,16 +160,21 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
         
         print(evaluate)
         print(len(data_loader))
+        j=0
         for i, (frames, targets, is_valid) in enumerate(data_loader):
             if not is_valid[0]:
                 continue
+            frames = torch.squeeze(frames, dim=0)  # DataLoader почему-то прибавляет лишнее измерение
+            targets = torch.squeeze(targets, dim=0)           
             test_loss = evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
             print("test_loss",test_loss)
-            total_test_loss+=test_loss
+            total_test_loss+=test_loss  
             with open('log2/testLoss.txt', 'a') as f:
                 s = 'epoch=' + str(epoch) +' i=' + str(i) + 'test_loss=' +str(test_loss)+'\n'
                 f.write(s)            
-            i+=100
+            j+=1
+            if(j>20):
+                break
  #   show_plot(plot_losses)
 
 def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda):

@@ -38,6 +38,11 @@ class EncoderRNN(nn.Module):
         # batch norm for CNN
         self.batchNorm1 = nn.BatchNorm2d(96)
         self.batchNorm2 = nn.BatchNorm2d(256)
+         
+        #dropout
+        self.dropout1 = nn.Dropout(0.2)
+        self.dropout2 = nn.Dropout(0.2)       
+
         self.lstm1=nn.LSTM(512,self.hidden_size,num_layers=3)
 #        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
 #        self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)       
@@ -74,7 +79,7 @@ class EncoderRNN(nn.Module):
 
     def CNN(self, x):
         # 1
-        
+               
         x = F.relu(self.conv1(x))
         x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
         x = self.batchNorm1(x)
@@ -86,9 +91,11 @@ class EncoderRNN(nn.Module):
         # 3
         x = F.relu(self.conv3(x))
         
+        x = self.dropout1(x)
         # 4
         x = F.relu(self.conv4(x))
         
+        x = self.dropout2(x)
         # 5
         x = F.relu(self.conv5(x))
         x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
@@ -96,7 +103,7 @@ class EncoderRNN(nn.Module):
         # 6
         x = x.view(x.shape[0],32768)
         x = self.fc6(x)  # должна ли быть функция актвации для последнего слоя?
-
+        
         return x
 
         
@@ -137,9 +144,9 @@ class DecoderRNN(nn.Module):
                 h[0],c[0] = self.lstm1(Y[i],(h[0].clone(),c[0].clone()))
                 h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
                 h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
-                c[2] = self.attention(h[2].clone(), outEncoder)
-                c[2] = torch.mm(c[2],outEncoder).cuda()
-                output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),c[2]),1 ) )
+                context = self.attention(h[2].clone(), outEncoder)
+                context = torch.mm(context,outEncoder).cuda()
+                output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),context),1 ) )
         else:
             seq_len = 20# максимальная длина
             output_decoder= torch.autograd.Variable(torch.zeros(seq_len, 1, 48)).cuda()   
@@ -147,18 +154,18 @@ class DecoderRNN(nn.Module):
             Y_cur = self.embedding( Variable(torch.LongTensor([alphabet.ch2index('<sos>')]).cuda()) ).view(1,self.hidden_size)
             for  i in range(seq_len-1):
                 j=i+1
-                h[0],c[0] = self.lstm1(Y_cur,(h[0],c[0]))
-                h[1],c[1] = self.lstm2(h[0],(h[1],c[1]))
-                h[2],c[2] = self.lstm3(h[1],(h[2],c[2]))
-                context = self.attention(h[2], outEncoder)
+                h[0],c[0] = self.lstm1(Y_cur,(h[0].clone(),c[0].clone()))
+                h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
+                h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
+                context = self.attention(h[2].clone(), outEncoder)
                 context = torch.mm(context,outEncoder)
-                char = self.MLP( torch.cat( (h[2],context),1 ) )
+                char = self.MLP( torch.cat( (h[2].clone(),context),1 ) )
                 output_decoder[j] = char.clone()
                 argmax = torch.max(output_decoder[j][0],dim=0)
-                if argmax[1][0] == alphabet.ch2index('<eos>'):
+                if argmax[1][0].data[0] == alphabet.ch2index('<eos>'):
                     seq_len=j+1
                     break
-                Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0]]).cuda()) ).view(1,self.hidden_size)
+                Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0].data[0]]).cuda()) ).view(1,self.hidden_size)
         return output_decoder,seq_len 
         
         
@@ -189,6 +196,7 @@ class DecoderRNN(nn.Module):
                seq_len=j+1
                break
             Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0]]).cuda()) ).view(1,self.hidden_size)
+
 #            print(output_decoder.shape)
         word=get_word(torch.LongTensor(listArgmax))
         print("res:",word)
