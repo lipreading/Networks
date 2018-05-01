@@ -79,16 +79,24 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
 
     return loss.data[0]
 
+#def get_loss(decoder_output,targets, criterion):
+#    if len(targets)==len(decoder_output):
+#        return criterion(decoder_output,targets)
+#    else:
+#        if len(targets)<len(decoder_output):
+#           compTarg =completeNull(targets,len(targets),len(decoder_output)).clone()
+#           return criterion(decoder_output,compTarg)
+#        else:
+#            assert False,"len target > len decoder_output"
+
 def get_loss(decoder_output,targets, criterion):
     if len(targets)==len(decoder_output):
         return criterion(decoder_output,targets)
-    else:
-        if len(targets)<len(decoder_output):
-           compTarg =completeNull(targets,len(targets),len(decoder_output)).clone()
-           return criterion(decoder_output,compTarg)
-        else:
-            assert False,"len target > len decoder_output"
-        
+    coef = abs(len(targets) - len(decoder_output)) + 1
+    if len(targets)<len(decoder_output):
+           return coef*criterion(decoder_output[:len(targets)],targets)  
+    return coef*criterion(decoder_output,targets[:len(decoder_output)])        
+
 def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                 print_every=10, plot_every=10, learning_rate=LEARNING_RATE):
 
@@ -159,7 +167,6 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
         plot_loss_total = 0
         
         print(evaluate)
-        print(len(data_loader))
         j=0
         for i, (frames, targets, is_valid) in enumerate(data_loader):
             if not is_valid[0]:

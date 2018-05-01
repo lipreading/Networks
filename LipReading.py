@@ -146,7 +146,7 @@ class DecoderRNN(nn.Module):
                 h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
                 context = self.attention(h[2].clone(), outEncoder)
                 context = torch.mm(context,outEncoder).cuda()
-                output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),context),1 ) )
+                output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),context),1 ) )    
         else:
             seq_len = 20# максимальная длина
             output_decoder= torch.autograd.Variable(torch.zeros(seq_len, 1, 48)).cuda()   
@@ -166,7 +166,7 @@ class DecoderRNN(nn.Module):
                     seq_len=j+1
                     break
                 Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0].data[0]]).cuda()) ).view(1,self.hidden_size)
-        return output_decoder,seq_len 
+        return output_decoder[:seq_len] 
         
         
     def evaluate(self,h0,c0,outEncoder): # sos в return быть не должно
@@ -202,7 +202,7 @@ class DecoderRNN(nn.Module):
         print("res:",word)
         with open('log2/result.txt', 'a') as f:
                  f.write("res:"+word+'\n')
-        return result,seq_len        
+        return result[:seq_len]        
  
     
     def MLP(self,v):
