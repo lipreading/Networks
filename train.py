@@ -62,7 +62,7 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
     encoder_output, encoder_hidden = encoder(frames,h0,c0)
     encoder_output = torch.squeeze(encoder_output,1)
     #print(encoder_hidden[0].shape)
-    decoder_output,true_len = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
+    decoder_output = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
     
     decoder_output = torch.squeeze(decoder_output,1).cuda()
 #    print(targets.shape)
@@ -198,7 +198,7 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
     encoder_output, encoder_hidden = encoder(frames,h0,c0)
     encoder_output = torch.squeeze(encoder_output,1)
 
-    decoder_output,true_len = decoder.evaluate(encoder_hidden[0],encoder_hidden[1],encoder_output)    
+    decoder_output = decoder.evaluate(encoder_hidden[0],encoder_hidden[1],encoder_output)    
     decoder_output = torch.squeeze(decoder_output,1)
  #   print(targets.shape)
  #   print(decoder_output.shape)
@@ -216,7 +216,6 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
    # print("res:",res)
     with open('log2/result.txt', 'a') as f:
         f.write("exp:"+res_exp+'\n')      
-    loss = criterion(decoder_output[:len(targets)],targets)
     loss = get_loss(decoder_output.cuda(), targets.cuda(),criterion)
     return loss.data[0]
 use_cuda = False

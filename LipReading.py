@@ -153,17 +153,16 @@ class DecoderRNN(nn.Module):
             alphabet = Alphabet()
             Y_cur = self.embedding( Variable(torch.LongTensor([alphabet.ch2index('<sos>')]).cuda()) ).view(1,self.hidden_size)
             for  i in range(seq_len-1):
-                j=i+1
                 h[0],c[0] = self.lstm1(Y_cur,(h[0].clone(),c[0].clone()))
                 h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
                 h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
                 context = self.attention(h[2].clone(), outEncoder)
                 context = torch.mm(context,outEncoder)
                 char = self.MLP( torch.cat( (h[2].clone(),context),1 ) )
-                output_decoder[j] = char.clone()
-                argmax = torch.max(output_decoder[j][0],dim=0)
+                output_decoder[i] = char.clone()
+                argmax = torch.max(output_decoder[i][0],dim=0)
                 if argmax[1][0].data[0] == alphabet.ch2index('<eos>'):
-                    seq_len=j+1
+                    seq_len=i+1
                     break
                 Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0].data[0]]).cuda()) ).view(1,self.hidden_size)
         return output_decoder[:seq_len] 
@@ -178,7 +177,6 @@ class DecoderRNN(nn.Module):
         listArgmax=[]# буквы, которые выдал
         Y_cur = self.embedding( Variable(torch.LongTensor([alphabet.ch2index('<sos>')]).cuda()) ).view(1,self.hidden_size)
         for  i in range(seq_len-1):
-            j=i+1
             h[0],c[0] = self.lstm1(Y_cur,(h[0],c[0]))
             h[1],c[1] = self.lstm2(h[0],(h[1],c[1]))
             h[2],c[2] = self.lstm3(h[1],(h[2],c[2]))
@@ -187,13 +185,13 @@ class DecoderRNN(nn.Module):
             context = torch.mm(context,outEncoder)
             char = self.MLP( torch.cat( (h[2],context),1 ) )
            # print(char.data[0])
-            result[j] = char.data
-            argmax = torch.max(result[j][0],dim=0)
+            result[i] = char.data
+            argmax = torch.max(result[i][0],dim=0)
             #print(result[j][0])
             listArgmax.append(argmax[1][0])
             if argmax[1][0] == alphabet.ch2index('<eos>'):
                #print("BREAK EVAL",argmax[1][0]) 
-               seq_len=j+1
+               seq_len=i+1
                break
             Y_cur=self.embedding( Variable(torch.LongTensor([argmax[1][0]]).cuda()) ).view(1,self.hidden_size)
 
