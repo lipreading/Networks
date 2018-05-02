@@ -15,12 +15,23 @@ from alphabet import Alphabet
 class LipsDataset(data.Dataset):
     """Lips custom Dataset"""
 
-    def __init__(self):
-        self.frame_dir = FRAME_DIR
+    def __init__(self, frame_dir):
+        self.frame_dir = frame_dir
         self.alphabet = Alphabet()
-        self.words = [name for name in os.listdir(FRAME_DIR)]
-        self.count = 0
+        # self.words = [name for name in os.listdir(FRAME_DIR)]
+
+        # для сквозного прохода по папкам с видео
+        self.words = []
+        for root, dirs, files in os.walk(self.frame_dir):
+            if not dirs:
+                self.words.append(root)
+
+            # print('root: ', root)
+            # print('dirs: ', dirs)
+            # print('files: ', files)
         print(FRAME_DIR)
+        print(self.words)
+        self.count = 0
 
     def __len__(self):
         return len(self.words)
@@ -28,7 +39,7 @@ class LipsDataset(data.Dataset):
     def __getitem__(self, index):
 
         # загружаем все кадры для слова
-        curr_dir = self.frame_dir + '/' + self.words[index]
+        curr_dir = self.words[index]
         frames_list = [name for name in os.listdir(curr_dir) if not re.match(r'__', name)]   
         if len(frames_list) < COUNT_FRAMES:
         #print(frames_list)
@@ -66,9 +77,9 @@ class LipsDataset(data.Dataset):
         return frames, targets, is_valid
 
 
-def get_loader():
+def get_loader(frame_dir):
 
-    lips_dataset = LipsDataset()
+    lips_dataset = LipsDataset(frame_dir)
     data_loader = torch.utils.data.DataLoader(dataset=lips_dataset,num_workers=20)
     # print(data_loader)
     return data_loader

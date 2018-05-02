@@ -113,11 +113,12 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
     criterion = nn.CrossEntropyLoss().cuda()
 
     # Загружаем данные - в итоге получаем объект типа torch.utils.data.Dataloader,
-    data_loader = get_loader()
+    train_data_loader = get_loader(FRAME_DIR_TRAIN)
+    evaluate_data_loader = get_loader(FRAME_DIR_TEST)
     words_amount = 0
     total_test_loss=0.0
     for epoch in range(1, num_epochs+1):
-        for i, (frames, targets, is_valid) in enumerate(data_loader):
+        for i, (frames, targets, is_valid) in enumerate(train_data_loader):
             # print(frames)
             # print(is_valid[0])
             if not is_valid[0]:
@@ -168,7 +169,7 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
         
         print(evaluate)
         j=0
-        for i, (frames, targets, is_valid) in enumerate(data_loader):
+        for i, (frames, targets, is_valid) in enumerate(evaluate_data_loader):
             if not is_valid[0]:
                 continue
             frames = torch.squeeze(frames, dim=0)  # DataLoader почему-то прибавляет лишнее измерение
