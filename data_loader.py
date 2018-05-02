@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import json
 
-from config import FRAME_DIR, COUNT_FRAMES
+from config import COUNT_FRAMES
 from alphabet import Alphabet
 
 
@@ -29,7 +29,6 @@ class LipsDataset(data.Dataset):
             # print('root: ', root)
             # print('dirs: ', dirs)
             # print('files: ', files)
-        print(FRAME_DIR)
         print(self.words)
         self.count = 0
 

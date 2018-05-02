@@ -4,6 +4,7 @@
 #import matplotlib.ticker as ticker
 import torch
 import os
+from torch import cuda
 
 from config import TRAINED_MODEL_PATH
 
@@ -38,4 +39,11 @@ def save_model(encoder, decoder):
 #    for each_line in input_data:
 #        numbers.append(float(each_line.strip()))
 ##print(numbers) 
-#show_plot(numbers)       
+#show_plot(numbers)
+
+
+def load_to_cuda(x):
+    if cuda.is_available():
+        return x.cuda()
+    else:
+        return x

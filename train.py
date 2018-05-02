@@ -13,13 +13,13 @@ import torch
 from LipReading import EncoderRNN, DecoderRNN
 from config import *
 from data_loader import get_loader
-from utilities import save_model
+from utilities import save_model, load_to_cuda
 from alphabet import Alphabet
 
 
 def completeNull(v,v_size,out_size):#v_size - размерность вектора, out_size - необходимая размерность
     alphabet=Alphabet()
-    newv = Variable(torch.LongTensor(out_size).zero_().cuda())
+    newv = Variable(load_to_cuda(torch.LongTensor(out_size).zero_()))
     for i in range(v_size):
          newv[i]=v[i].clone()
  #   j=v_size
@@ -28,10 +28,10 @@ def completeNull(v,v_size,out_size):#v_size - размерность векто�
   #      j+=1
     return newv    
 
-def to_var(x, volatile=False):
+def to_var(x):
     if cuda.is_available():
         x = x.cuda()
-    return Variable(x, volatile=volatile)
+    return Variable(x)
 
 def get_word(seq): # seq-числа
     #print(seq)
@@ -43,7 +43,7 @@ def get_word(seq): # seq-числа
         #print("el:",el.data)
         s+=alphabet.index2ch(el)
     return s
-def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda,teacher_force):
+def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion,teacher_force):
 
     #encoder_hidden = encoder.initHidden()
 
@@ -56,21 +56,21 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
     # input_length = frames.size()[0]
     # target_length = targets_for_training.size()[0]
     #print("frames",frames.shape)
-    h0 = Variable(torch.zeros(3, 1, encoder.hidden_size)).cuda()
-    c0 = Variable(torch.zeros(3, 1, encoder.hidden_size)).cuda()
+    h0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
+    c0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
        
     encoder_output, encoder_hidden = encoder(frames,h0,c0)
     encoder_output = torch.squeeze(encoder_output,1)
     #print(encoder_hidden[0].shape)
     decoder_output = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
     
-    decoder_output = torch.squeeze(decoder_output,1).cuda()
+    decoder_output = load_to_cuda(torch.squeeze(decoder_output,1))
 #    print(targets.shape)
 #    targets = torch.squeeze(targets,1)
     # print(targets)
     targets=targets[1:]# убираем sos
    # print("Len",len(targets),len(decoder_output))
-    loss = get_loss(decoder_output.cuda(), targets.cuda(),criterion)
+    loss = get_loss(load_to_cuda(decoder_output), load_to_cuda(targets),criterion)
    
     # print(loss.data[0])
     loss.backward()
@@ -97,7 +97,7 @@ def get_loss(decoder_output,targets, criterion):
            return coef*criterion(decoder_output[:len(targets)],targets)  
     return coef*criterion(decoder_output,targets[:len(decoder_output)])        
 
-def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
+def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
                 print_every=10, plot_every=10, learning_rate=LEARNING_RATE):
 
     print('ITERATIONS: {}, BATCH SIZE: {}, LEARNING RATE: {}'
@@ -110,7 +110,7 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = load_to_cuda(nn.CrossEntropyLoss())
 
     # Загружаем данные - в итоге получаем объект типа torch.utils.data.Dataloader,
     train_data_loader = get_loader(FRAME_DIR_TRAIN)
@@ -125,6 +125,8 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                 continue
             frames = torch.squeeze(frames, dim=0)  # DataLoader почему-то прибавляет лишнее измерение
             targets = torch.squeeze(targets, dim=0)
+
+
             # print(frames.shape)
 
             #targets_for_training = torch.LongTensor(targets.shape[0], 48).zero_()
@@ -141,7 +143,7 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                     teacher_force=0.15
                 else:
                     teacher_force=0.3                        
-            loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda,teacher_force)
+            loss = train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion,teacher_force)
            # print("finished words:",i+1)
            #print("train_loss",loss)
            # print("tot",total_test_loss)
@@ -174,7 +176,7 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                 continue
             frames = torch.squeeze(frames, dim=0)  # DataLoader почему-то прибавляет лишнее измерение
             targets = torch.squeeze(targets, dim=0)           
-            test_loss = evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda)
+            test_loss = evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
             print("test_loss",test_loss)
             total_test_loss+=test_loss  
             with open('log2/testLoss.txt', 'a') as f:
@@ -185,11 +187,11 @@ def train_iters(encoder, decoder, use_cuda, num_epochs=NUM_EPOCHS,
                 break
  #   show_plot(plot_losses)
 
-def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, use_cuda):
+def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion):
 
    # encoder_hidden = encoder.initHidden()
-    h0 = Variable(torch.zeros(3, 1, encoder.hidden_size)).cuda()
-    c0 = Variable(torch.zeros(3, 1, encoder.hidden_size)).cuda()
+    h0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
+    c0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
 
     
     frames = frames.float()
@@ -206,7 +208,7 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
     decoder_output=Variable(decoder_output)
     targets=targets[1:]# убираем sos
     res_exp=get_word(targets[:len(targets)-1].data)#записываем без eos
-    seq=torch.LongTensor(decoder_output.shape[0]-1).cuda()
+    seq=load_to_cuda(torch.LongTensor(decoder_output.shape[0]-1))
 #    for i in range(len(seq)):
 #        argmax = torch.max(decoder_output[i][0],dim=0)
 #        # print(seq[i])
@@ -217,25 +219,21 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
    # print("res:",res)
     with open('log2/result.txt', 'a') as f:
         f.write("exp:"+res_exp+'\n')      
-    loss = get_loss(decoder_output.cuda(), targets.cuda(),criterion)
+    loss = get_loss(load_to_cuda(decoder_output), load_to_cuda(targets),criterion)
     return loss.data[0]
 
 
 try:
-    use_cuda = False
     if cuda.is_available():
         print('cuda is available!')
-        use_cuda = True
 
     # Build the model
     encoder = EncoderRNN()
     decoder = DecoderRNN()
     if cuda.is_available():
-        print('cuda is available!')
-        use_cuda = True
         encoder.cuda()
         decoder.cuda()
-    train_iters(encoder, decoder, use_cuda)
+    train_iters(encoder, decoder)
 
     save_model(encoder, decoder)
 except Exception as e:  # если вдруг произошла какя-то ошибка при обучении, сохраняем модель
