@@ -219,20 +219,26 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
         f.write("exp:"+res_exp+'\n')      
     loss = get_loss(decoder_output.cuda(), targets.cuda(),criterion)
     return loss.data[0]
-use_cuda = False
-if cuda.is_available():
-    print('cuda is available!')
-    use_cuda = True
 
-# Build the model
-encoder = EncoderRNN()
-decoder = DecoderRNN()
-if cuda.is_available():
-    print('cuda is available!')
-    use_cuda = True
-    encoder.cuda()
-    decoder.cuda()
-train_iters(encoder, decoder, use_cuda)
 
-save_model(encoder, decoder)
+try:
+    use_cuda = False
+    if cuda.is_available():
+        print('cuda is available!')
+        use_cuda = True
+
+    # Build the model
+    encoder = EncoderRNN()
+    decoder = DecoderRNN()
+    if cuda.is_available():
+        print('cuda is available!')
+        use_cuda = True
+        encoder.cuda()
+        decoder.cuda()
+    train_iters(encoder, decoder, use_cuda)
+
+    save_model(encoder, decoder)
+except Exception as e:  # если вдруг произошла какя-то ошибка при обучении, сохраняем модель
+    print(e)
+    save_model(encoder, decoder)
 
