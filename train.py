@@ -117,15 +117,20 @@ def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
     evaluate_data_loader = get_loader(FRAME_DIR_TEST)
     words_amount = 0
     total_test_loss=0.0
+    # frames_batch
+    frames_batch = []
+    targets_batch = []
+    batch_count = 0
     for epoch in range(1, num_epochs+1):
-        for i, (frames, targets, is_valid) in enumerate(train_data_loader):
+        for i, (frames, targets) in enumerate(train_data_loader):
+            print('train - frames: ', frames.shape)
+            print('train - targets: ', targets.shape)
+
             # print(frames)
             # print(is_valid[0])
-            if not is_valid[0]:
-                continue
-            frames = torch.squeeze(frames, dim=0)  # DataLoader почему-то прибавляет лишнее измерение
-            targets = torch.squeeze(targets, dim=0)
 
+            # frames = torch.squeeze(frames, dim=0)  # DataLoader почему-то прибавляет лишнее измерение
+            # targets = torch.squeeze(targets, dim=0)
 
             # print(frames.shape)
 
@@ -168,7 +173,11 @@ def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
 
         plot_losses.append(plot_loss_total/words_amount)
         plot_loss_total = 0
-        
+        #
+        # frames_batch = []  # очищаем батч
+        # targets_batch = []
+        # batch_count = 0
+
         print(evaluate)
         j=0
         for i, (frames, targets, is_valid) in enumerate(evaluate_data_loader):
