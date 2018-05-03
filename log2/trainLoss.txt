@@ -1644,3 +1644,5 @@ epoch=3 i=241train_loss=13.149575233459473
 epoch=3 i=242train_loss=14.636703491210938
 epoch=3 i=243train_loss=3.3169984817504883
 epoch=3 i=244train_loss=2.693896532058716
+finish epoch=1train_loss=0
+finish epoch=1train_loss=0

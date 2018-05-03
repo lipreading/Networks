@@ -10,7 +10,7 @@ import numpy as np
 from alphabet import Alphabet
 from utilities import load_to_cuda
 
-def get_word(seq): # seq-числа
+def get_word(seq): # seq-числаf
     #print(seq)
     alphabet=Alphabet()
     s=""
@@ -41,8 +41,8 @@ class EncoderRNN(nn.Module):
         self.batchNorm2 = nn.BatchNorm2d(256)
          
         #dropout
-        self.dropout1 = nn.Dropout(0.2)
-        self.dropout2 = nn.Dropout(0.2)       
+        self.dropout1 = nn.Dropout(0.1)
+        self.dropout2 = nn.Dropout(0.1)       
 
         self.lstm1=nn.LSTM(512,self.hidden_size,num_layers=3)
 #        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
@@ -50,10 +50,14 @@ class EncoderRNN(nn.Module):
         
         
     def forward(self,input,h,c):
-#        output = self.CNN(input)            
-        CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_()) # то есть первый параметр это seq_len; второй выход CNN
+        first_dim=input.shape[0]
+        second_dim=input.shape[1]
+        input=input.view(input.shape[0]*input.shape[1],5,120,120)
+        CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_(),requires_grad=True) # то есть первый параметр это seq_len; второй выход CNN
         
         CNN_out=self.CNN(input)
+        print(CNN_out.shape)
+        CNN_out=CNN_out.view(second_dim,first_dim,512)# меняем местами first и second, так как в lstm первая это seq_len, вторая - batch
         return self.RNN(load_to_cuda(CNN_out),h,c)
 
     #        out = self.CNN(input)
@@ -70,8 +74,9 @@ class EncoderRNN(nn.Module):
     #        return output,hidden
     #
     def RNN(self, input,h,c):  # input.shape= seq_len*512
-        input = load_to_cuda(torch.unsqueeze(input, 1))
+       # input = load_to_cuda(torch.unsqueeze(input, 1))
         output, hidden = self.lstm1(input,(h,c))
+        print(output.shape)
         return output, hidden
 
 #    def initHidden(self):
@@ -140,12 +145,14 @@ class DecoderRNN(nn.Module):
         if (np.random.rand()>teacher_force):
             seq_len=Y.shape[0]-1
             output_decoder= load_to_cuda(torch.autograd.Variable(torch.zeros(Y.shape[0]-1, 1, 48)))
-            Y = self.embedding(Y).view(Y.shape[0], 1, self.hidden_size)
+            Y = self.embedding(Y).view(Y.shape[0], BATCH_SIZE, self.hidden_size)
             for  i in range(len(Y)-1): # -1 так как sos не учитывем в criterion
                 h[0],c[0] = self.lstm1(Y[i],(h[0].clone(),c[0].clone()))
                 h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
                 h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
+                print("DECRNN",h.shape)
                 context = self.attention(h[2].clone(), outEncoder)
+                print("context",context.shape)
                 context = load_to_cuda(torch.mm(context,outEncoder))
                 output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),context),1 ) )    
         else:
@@ -166,6 +173,7 @@ class DecoderRNN(nn.Module):
                     seq_len=i+1
                     break
                 Y_cur=self.embedding( Variable(load_to_cuda(torch.LongTensor([argmax[1][0].data[0]]))) ).view(1,self.hidden_size)
+        print("OUT_DEC:",output_decoder.shape)
         return output_decoder[:seq_len] 
         
         

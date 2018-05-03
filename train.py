@@ -56,8 +56,8 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
     # input_length = frames.size()[0]
     # target_length = targets_for_training.size()[0]
     #print("frames",frames.shape)
-    h0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
-    c0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
+    h0 = load_to_cuda(Variable(torch.zeros(3, BATCH_SIZE, encoder.hidden_size)))
+    c0 = load_to_cuda(Variable(torch.zeros(3, BATCH_SIZE, encoder.hidden_size)))
        
     encoder_output, encoder_hidden = encoder(frames,h0,c0)
     encoder_output = torch.squeeze(encoder_output,1)
@@ -178,22 +178,18 @@ def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
         # targets_batch = []
         # batch_count = 0
 
-        print(evaluate)
-        j=0
-        for i, (frames, targets, is_valid) in enumerate(evaluate_data_loader):
-            if not is_valid[0]:
-                continue
-            frames = torch.squeeze(frames, dim=0)  # DataLoader почему-то прибавляет лишнее измерение
-            targets = torch.squeeze(targets, dim=0)           
-            test_loss = evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
-            print("test_loss",test_loss)
-            total_test_loss+=test_loss  
-            with open('log2/testLoss.txt', 'a') as f:
-                s = 'epoch=' + str(epoch) +' i=' + str(i) + 'test_loss=' +str(test_loss)+'\n'
-                f.write(s)            
-            j+=1
-            if(j>20):
-                break
+#        for i, (frames, targets, is_valid) in enumerate(evaluate_data_loader):
+#            if not is_valid[0]:
+#                continue
+#            frames = torch.squeeze(frames, dim=0)  # DataLoader почему-то прибавляет лишнее измерение
+#            targets = torch.squeeze(targets, dim=0)           
+#            test_loss = evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
+#            print("test_loss",test_loss)
+#            total_test_loss+=test_loss  
+#            with open('log2/testLoss.txt', 'a') as f:
+#                s = 'epoch=' + str(epoch) +' i=' + str(i) + 'test_loss=' +str(test_loss)+'\n'
+#                f.write(s)            
+
  #   show_plot(plot_losses)
 
 def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion):
@@ -246,6 +242,6 @@ try:
 
     save_model(encoder, decoder)
 except Exception as e:  # если вдруг произошла какя-то ошибка при обучении, сохраняем модель
-    print(e)
-    save_model(encoder, decoder)
+   print(e)
+   # save_model(encoder, decoder)
 

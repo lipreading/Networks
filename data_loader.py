@@ -73,7 +73,7 @@ class LipsDataset(data.Dataset):
         characters.append(self.alphabet.ch2index('<eos>'))
 
         targets = torch.LongTensor(characters)
-        print('get_item - targets: ', targets)
+        #print('get_item - targets: ', targets)
         return frames, targets, is_valid
 
 
@@ -81,7 +81,7 @@ def collate_fn(data):
     frames, targets, is_valid = zip(*data)
 
     # print('collate_fn - raw targets: ', targets)
-    print('collate_fn - raw frames shape: ', frames[0].shape)
+    #print('collate_fn - raw frames shape: ', frames[0].shape)
 
     targets_lengths = [len(target) for target in targets]
     # print('collate_fn - targets_lengths: ', targets_lengths)
@@ -92,12 +92,12 @@ def collate_fn(data):
     # print('collate_fn - batch_targets: ', batch_targets)
 
     frames_lengths = [frame.shape[0] for frame in frames]
-    print('collate_fn - frames_lengths: ', frames_lengths)
+  #  print('collate_fn - frames_lengths: ', frames_lengths)
     batch_frames = torch.zeros(len(frames), max(frames_lengths), COUNT_FRAMES, 120, 120).long()
     for i, frame in enumerate(frames):
         end = frames_lengths[i]
         batch_frames[i, :end] = frame[:end]
-    print('collate_fn - batch_frames: ', batch_frames.shape)
+  #  print('collate_fn - batch_frames: ', batch_frames.shape)
 
     return batch_frames, batch_targets  # batch_targets.shape = BATCH_SIZE*max_targets_length
                                         # batch_frames.shape = BATCH_SIZE*max_frames_length*5*120*120
