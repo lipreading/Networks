@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-FRAME_DIR='test_frames'  # работает для ВСЕГО датасета, то есть это папка с разными видео
+FRAME_DIR='/home/a.chernov/dataset/23.04/framePacks/5vxCIdHZWoA'  # работает для ВСЕГО датасета, то есть это папка с разными видео
 
 let border=5  # граница отсева слов с маленьким кол-вом кадров
 

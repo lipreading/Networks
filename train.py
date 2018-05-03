@@ -15,7 +15,7 @@ from config import *
 from data_loader import get_loader
 from utilities import save_model, load_to_cuda
 from alphabet import Alphabet
-
+import time
 
 def completeNull(v,v_size,out_size):#v_size - размерность вектора, out_size - необходимая размерность
     alphabet=Alphabet()
@@ -67,10 +67,11 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
     decoder_output = load_to_cuda(torch.squeeze(decoder_output,1))
 #    print(targets.shape)
 #    targets = torch.squeeze(targets,1)
-    # print(targets)
-    targets=targets[1:]# убираем sos
-   # print("Len",len(targets),len(decoder_output))
-    loss = get_loss(load_to_cuda(decoder_output), load_to_cuda(targets),criterion)
+    #print(targets)
+    targets=targets[:,1:]# убираем sos
+
+    #print("Len",targets.shape,decoder_output.shape)
+    loss = get_loss(load_to_cuda(torch.t(decoder_output)), load_to_cuda(targets),criterion)
    
     # print(loss.data[0])
     loss.backward()
@@ -79,7 +80,7 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
 
     return loss.data[0]
 
-#def get_loss(decoder_output,targets, criterion):
+#def get_loss(decoder_output,targets, citerion):
 #    if len(targets)==len(decoder_output):
 #        return criterion(decoder_output,targets)
 #    else:
@@ -90,7 +91,11 @@ def train(frames, targets, encoder, decoder, encoder_optimizer, decoder_optimize
 #            assert False,"len target > len decoder_output"
 
 def get_loss(decoder_output,targets, criterion):
+    #print('start get_loss')
+    decoder_output=decoder_output.contiguous().view(decoder_output.shape[0]*decoder_output.shape[1],-1)
+    targets=targets.contiguous().view(targets.shape[0]*targets.shape[1])
     if len(targets)==len(decoder_output):
+       # print('keka')
         return criterion(decoder_output,targets)
     coef = abs(len(targets) - len(decoder_output)) + 1
     if len(targets)<len(decoder_output):
@@ -110,7 +115,7 @@ def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
-    criterion = load_to_cuda(nn.CrossEntropyLoss())
+    criterion = load_to_cuda(nn.CrossEntropyLoss(size_average=False))
 
     # Загружаем данные - в итоге получаем объект типа torch.utils.data.Dataloader,
     train_data_loader = get_loader(FRAME_DIR_TRAIN)
@@ -121,10 +126,12 @@ def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
     frames_batch = []
     targets_batch = []
     batch_count = 0
+    start_time=time.time()
     for epoch in range(1, num_epochs+1):
+        count_words=0
         for i, (frames, targets) in enumerate(train_data_loader):
-            print('train - frames: ', frames.shape)
-            print('train - targets: ', targets.shape)
+            #print('train - frames: ', frames.shape)
+            # print('train - targets: ', targets.shape)
 
             # print(frames)
             # print(is_valid[0])
@@ -142,7 +149,7 @@ def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
             # print('targets: ', targets.shape)
             # print('frames: ', frames.shape)
             if epoch<=300:
-                teacher_force=0.5
+                teacher_force=0.0
             else:
                 if epoch<=200:
                     teacher_force=0.15
@@ -157,7 +164,7 @@ def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
                      f.write(s) 
             print_loss_total += loss
             plot_loss_total += loss
-            words_amount += 1
+            count_words+=1
         
         with open('log2/trainLoss.txt', 'a') as f:
                      s = 'finish epoch=' + str(epoch) + 'train_loss=' +str(print_loss_total)+'\n'
@@ -170,9 +177,10 @@ def train_iters(encoder, decoder, num_epochs=NUM_EPOCHS,
 
         print('iteration: {}, loss: {}'.format(epoch, print_loss_total))
         print_loss_total = 0
-
-        plot_losses.append(plot_loss_total/words_amount)
-        plot_loss_total = 0
+        print("--- %s seconds ---" % (time.time() - start_time))
+        print("count_words:",count_words)
+      #  plot_losses.append(plot_loss_total/words_amount)
+       # plot_loss_total = 0
         #
         # frames_batch = []  # очищаем батч
         # targets_batch = []
@@ -233,7 +241,9 @@ try:
         print('cuda is available!')
 
     # Build the model
-    encoder = EncoderRNN()
+  #  self.conv1=nn.DataParallel(self.conv1)
+    encoder=EncoderRNN()
+   # encoder =nn.DataParallel(encoder)
     decoder = DecoderRNN()
     if cuda.is_available():
         encoder.cuda()
@@ -243,5 +253,5 @@ try:
     save_model(encoder, decoder)
 except Exception as e:  # если вдруг произошла какя-то ошибка при обучении, сохраняем модель
    print(e)
-   # save_model(encoder, decoder)
+   save_model(encoder, decoder)
 

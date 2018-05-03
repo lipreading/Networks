@@ -6,7 +6,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-
+from config import *
 from alphabet import Alphabet
 from utilities import load_to_cuda
 
@@ -47,7 +47,12 @@ class EncoderRNN(nn.Module):
         self.lstm1=nn.LSTM(512,self.hidden_size,num_layers=3)
 #        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
 #        self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)       
-        
+       # self.conv1=nn.DataParallel(self.conv1)
+       # self.conv2=nn.DataParallel(self.conv2)
+       # self.conv3=nn.DataParallel(self.conv3)
+       # self.conv4=nn.DataParallel(self.conv4)       
+       # self.conv5=nn.DataParallel(self.conv5)
+       # self.lstm1=nn.DataParallel(self.lstm1)
         
     def forward(self,input,h,c):
         first_dim=input.shape[0]
@@ -56,7 +61,6 @@ class EncoderRNN(nn.Module):
         CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_(),requires_grad=True) # то есть первый параметр это seq_len; второй выход CNN
         
         CNN_out=self.CNN(input)
-        print(CNN_out.shape)
         CNN_out=CNN_out.view(second_dim,first_dim,512)# меняем местами first и second, так как в lstm первая это seq_len, вторая - batch
         return self.RNN(load_to_cuda(CNN_out),h,c)
 
@@ -76,7 +80,6 @@ class EncoderRNN(nn.Module):
     def RNN(self, input,h,c):  # input.shape= seq_len*512
        # input = load_to_cuda(torch.unsqueeze(input, 1))
         output, hidden = self.lstm1(input,(h,c))
-        print(output.shape)
         return output, hidden
 
 #    def initHidden(self):
@@ -133,7 +136,14 @@ class DecoderRNN(nn.Module):
         self.att_b = load_to_cuda(Variable(torch.randn(self.hidden_size,1), requires_grad=True))
         
         #MLP
-        self.MLP_hidden_size = 256
+        self.MLP_hidden_size=256
+ #       self.MLP_seq=nn.Sequential(
+ #              nn.Linear(2*self.MLP_hidden_size,self.MLP_hidden_size),
+ #              nn.ReLU(),
+ #              nn.Linear(self.MLP_hidden_size,self.MLP_hidden_size),
+ #              nn.ReLU(),
+ #              nn.Linear(self.MLP_hidden_size,48))
+ #       self.MLP_seq=nn.DataParallel(self.MLP_seq)
         self.MLP_fc1 = nn.Linear(2*self.MLP_hidden_size,self.MLP_hidden_size)        
         self.MLP_fc2 = nn.Linear(self.MLP_hidden_size,self.MLP_hidden_size)        
         self.MLP_fc3=nn.Linear(self.MLP_hidden_size,48)
@@ -141,30 +151,31 @@ class DecoderRNN(nn.Module):
     def forward(self,Y,h0,c0, outEncoder,teacher_force):# Y это кол-во символов умножить на 256
         h = load_to_cuda(h0.clone())
         c = load_to_cuda(c0.clone())
-        
+        Y=Y.view(Y.shape[1],Y.shape[0])# из за LSTM
         if (np.random.rand()>teacher_force):
             seq_len=Y.shape[0]-1
-            output_decoder= load_to_cuda(torch.autograd.Variable(torch.zeros(Y.shape[0]-1, 1, 48)))
-            Y = self.embedding(Y).view(Y.shape[0], BATCH_SIZE, self.hidden_size)
+            output_decoder= load_to_cuda(torch.autograd.Variable(torch.zeros(Y.shape[0]-1, BATCH_SIZE, 48)))
+            Y = self.embedding(Y)
             for  i in range(len(Y)-1): # -1 так как sos не учитывем в criterion
+                #print(Y.shape)
                 h[0],c[0] = self.lstm1(Y[i],(h[0].clone(),c[0].clone()))
+                #print(h[0].shape)
                 h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
                 h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
-                print("DECRNN",h.shape)
                 context = self.attention(h[2].clone(), outEncoder)
-                print("context",context.shape)
-                context = load_to_cuda(torch.mm(context,outEncoder))
-                output_decoder[i] = self.MLP( torch.cat( (h[2].clone(),context),1 ) )    
+                context = load_to_cuda( torch.bmm( context,outEncoder.view(outEncoder.shape[1],outEncoder.shape[0],-1) ) )
+                cat =torch.cat( (h[2].clone(),torch.squeeze(context,1)) ,1 )
+                output_decoder[i] = self.MLP(cat)    
         else:
             seq_len = 20# максимальная длина
             output_decoder= load_to_cuda(torch.autograd.Variable(torch.zeros(seq_len, 1, 48)))
             alphabet = Alphabet()
             Y_cur = self.embedding( load_to_cuda(Variable(torch.LongTensor([alphabet.ch2index('<sos>')]))) ).view(1,self.hidden_size)
+            Y_cur=Y_cur.expand(BATCH_SIZE,self.hidden_size)
             for  i in range(seq_len-1):
                 h[0],c[0] = self.lstm1(Y_cur,(h[0].clone(),c[0].clone()))
                 h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
                 h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
-                context = self.attention(h[2].clone(), outEncoder)
                 context = torch.mm(context,outEncoder)
                 char = self.MLP( torch.cat( (h[2].clone(),context),1 ) )
                 output_decoder[i] = char.clone()
@@ -173,7 +184,6 @@ class DecoderRNN(nn.Module):
                     seq_len=i+1
                     break
                 Y_cur=self.embedding( Variable(load_to_cuda(torch.LongTensor([argmax[1][0].data[0]]))) ).view(1,self.hidden_size)
-        print("OUT_DEC:",output_decoder.shape)
         return output_decoder[:seq_len] 
         
         
@@ -219,14 +229,15 @@ class DecoderRNN(nn.Module):
         return v 
     def attention(self,hidden, outEncoder):# то есть hidden это 1*1*256; outEncoder это 10*1*256        
         outEnSize= outEncoder.shape[0]
-      #  print("hid",hidden.shape)
-        hidden= torch.t(hidden.expand(outEnSize,-1))
-        WS = torch.mm(self.att_W,hidden)       
+        hidden= hidden.expand(outEnSize,-1,-1)
+        hidden=hidden.contiguous().view(hidden.shape[1],self.hidden_size,hidden.shape[0])
+       # print(hidden.shape)
+        WS = torch.bmm(self.att_W.expand(BATCH_SIZE,-1,-1),hidden)
 #        print(outEncoder.shape)
 #        print(self.att_V.shape)
-        VOut = torch.mm(self.att_V,torch.t(outEncoder))
-        E = F.tanh(WS + VOut + self.att_b.expand(-1,outEnSize))
-        E = torch.mm(self.att_vector,E)
+        VOut = torch.bmm(self.att_V.expand(BATCH_SIZE,-1,-1),outEncoder.view(BATCH_SIZE,self.hidden_size,outEnSize))
+        E = F.tanh(WS + VOut + self.att_b.expand(BATCH_SIZE,-1,outEnSize))
+        E = torch.bmm(self.att_vector.expand(BATCH_SIZE,-1,-1),E)
 #        i=0
 #        for out_enc_i in outEncoder:
 #             out2 = torch.unsqueeze(out_enc_i,0)
@@ -235,7 +246,7 @@ class DecoderRNN(nn.Module):
 #             out=out.view(-1,1)
 #             e[i]= torch.mm(self.w,out)
 #             i=i+1
-        return F.softmax(E, dim=1)          
+        return F.softmax(E, dim=2)          
 
 #%%        
 #encoder = EncoderRNN()

@@ -29,7 +29,7 @@ class LipsDataset(data.Dataset):
             # print('root: ', root)
             # print('dirs: ', dirs)
             # print('files: ', files)
-        print(self.words)
+       # print(self.words)
         self.count = 0
 
     def __len__(self):
@@ -106,7 +106,7 @@ def collate_fn(data):
 def get_loader(frame_dir):
 
     lips_dataset = LipsDataset(frame_dir)
-    data_loader = torch.utils.data.DataLoader(dataset=lips_dataset, num_workers=20,
+    data_loader = torch.utils.data.DataLoader(dataset=lips_dataset, num_workers=4,
                                               collate_fn=collate_fn, batch_size=BATCH_SIZE)
     # print(data_loader)
     return data_loader

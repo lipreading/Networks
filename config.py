@@ -4,11 +4,11 @@ TRAINED_MODEL_PATH = 'model2'  # куда сохранять тренирова�
 # FRAME_DIR_TRAIN = '/home/a.chernov/dataset/23.04/framePacks/5vxCIdHZWoA'  # директория с исходниками кадров
 # FRAME_DIR_TEST = 'test_frames_copy'
 
-FRAME_DIR_TRAIN = '/home/andrey/datasetsNN/LipReading/FramePack2/framePacks/short'  # директория с исходниками кадров
-FRAME_DIR_TEST = '/home/andrey/datasetsNN/LipReading/FramePack2/framePacks/short'
+FRAME_DIR_TRAIN = '/home/a.chernov/dataset/02.05/framePacks/5vxCIdHZWoA'  # директория с исходниками кадров
+FRAME_DIR_TEST = '/home/a.chernov/dataset/02.05/framePacks/5vxCIdHZWoA'
 
 LEARNING_RATE = 0.001
-NUM_EPOCHS = 300
+NUM_EPOCHS = 50
 COUNT_FRAMES = 5
-BATCH_SIZE = 8
+BATCH_SIZE = 2
 
