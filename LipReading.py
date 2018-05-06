@@ -22,6 +22,48 @@ def get_word(seq): # seq-числаf
                s+=alphabet.index2ch(el)
     return s
 
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=5, out_channels=96, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.conv2 = nn.Conv2d(in_channels=96, out_channels=256, kernel_size=(3, 3), padding=1, stride=(2, 2))
+        self.conv3 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(3, 3), padding=1)
+        self.conv4 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3, 3), padding=1)
+        self.conv5 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3, 3), padding=1)
+        self.fc6 = nn.Linear(32768, 512)  # 512*8*8=32768 перейдет в 512
+
+        # batch norm for CNN
+        self.batchNorm1 = nn.BatchNorm2d(96)
+        self.batchNorm2 = nn.BatchNorm2d(256)
+         
+        #dropout
+        self.dropout1 = nn.Dropout(0.1)
+        self.dropout2 = nn.Dropout(0.1)   
+    def forward(self,x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
+        x = self.batchNorm1(x)
+        # 2
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
+        x = self.batchNorm2(x)
+
+        # 3
+        x = F.relu(self.conv3(x))
+        
+        x = self.dropout1(x)
+        # 4
+        x = F.relu(self.conv4(x))
+        
+        x = self.dropout2(x)
+        # 5
+        x = F.relu(self.conv5(x))
+        x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
+        
+        # 6
+        x = x.view(x.shape[0],32768)
+        x = self.fc6(x)  # должна ли быть функция актвации для последнего слоя?
+        
 class EncoderRNN(nn.Module):
 
     def __init__(self):
@@ -43,7 +85,7 @@ class EncoderRNN(nn.Module):
         #dropout
         self.dropout1 = nn.Dropout(0.1)
         self.dropout2 = nn.Dropout(0.1)       
-
+        
         self.lstm1=nn.LSTM(512,self.hidden_size,num_layers=3)
 #        self.lstm2=nn.LSTM(self.hidden_size,self.hidden_size)
 #        self.lstm3=nn.LSTM(self.hidden_size,self.hidden_size)       
@@ -58,9 +100,11 @@ class EncoderRNN(nn.Module):
         first_dim=input.shape[0]
         second_dim=input.shape[1]
         input=input.view(input.shape[0]*input.shape[1],5,120,120)
-        CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_(),requires_grad=True) # то есть первый параметр это seq_len; второй выход CNN
-        
-        CNN_out=self.CNN(input)
+       # CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_(),requires_grad=True) # то есть первый параметр это seq_len; второй выход CNN
+        cnn = CNN()
+        cnn = nn.DataParallel(cnn)
+        CNN_out=cnn(input)
+        #CNN_out=self.CNN(input)
         CNN_out=CNN_out.view(second_dim,first_dim,512)# меняем местами first и second, так как в lstm первая это seq_len, вторая - batch
         return self.RNN(load_to_cuda(CNN_out),h,c)
 
@@ -86,34 +130,34 @@ class EncoderRNN(nn.Module):
 #        return (torch.autograd.Variable(torch.randn(1, 1, self.hidden_size).cuda()),
 #                torch.autograd.Variable(torch.randn((1, 1, self.hidden_size)).cuda()))
 
-    def CNN(self, x):
-        # 1
-               
-        x = F.relu(self.conv1(x))
-        x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
-        x = self.batchNorm1(x)
-        # 2
-        x = F.relu(self.conv2(x))
-        x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
-        x = self.batchNorm2(x)
-
-        # 3
-        x = F.relu(self.conv3(x))
-        
-        x = self.dropout1(x)
-        # 4
-        x = F.relu(self.conv4(x))
-        
-        x = self.dropout2(x)
-        # 5
-        x = F.relu(self.conv5(x))
-        x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
-        
-        # 6
-        x = x.view(x.shape[0],32768)
-        x = self.fc6(x)  # должна ли быть функция актвации для последнего слоя?
-        
-        return x
+#    def CNN(self, x):
+#        # 1
+#               
+#        x = F.relu(self.conv1(x))
+#        x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
+#        x = self.batchNorm1(x)
+#        # 2
+#        x = F.relu(self.conv2(x))
+#        x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
+#        x = self.batchNorm2(x)
+#
+#        # 3
+#        x = F.relu(self.conv3(x))
+#        
+#        x = self.dropout1(x)
+#        # 4
+#        x = F.relu(self.conv4(x))
+#        
+#        x = self.dropout2(x)
+#        # 5
+#        x = F.relu(self.conv5(x))
+#        x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
+#        
+#        # 6
+#        x = x.view(x.shape[0],32768)
+#        x = self.fc6(x)  # должна ли быть функция актвации для последнего слоя?
+#        
+#        return x
 
         
 class DecoderRNN(nn.Module):
