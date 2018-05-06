@@ -40,6 +40,10 @@ class CNN(nn.Module):
         self.dropout1 = nn.Dropout(0.1)
         self.dropout2 = nn.Dropout(0.1)   
     def forward(self,x):
+        first_dim=x.shape[0]
+        second_dim=x.shape[1]
+        x=x.view(x.shape[0]*x.shape[1],5,120,120)
+       
         x = F.relu(self.conv1(x))
         x = F.max_pool2d(x, kernel_size=(3, 3), stride=2, padding=1)
         x = self.batchNorm1(x)
@@ -63,6 +67,7 @@ class CNN(nn.Module):
         # 6
         x = x.view(x.shape[0],32768)
         x = self.fc6(x)  # должна ли быть функция актвации для последнего слоя?
+        return x.view(second_dim,first_dim,512)# меняем местами first и second, так как в lstm первая это seq_len, вторая - batch
         
 class EncoderRNN(nn.Module):
 
@@ -97,16 +102,16 @@ class EncoderRNN(nn.Module):
        # self.lstm1=nn.DataParallel(self.lstm1)
         
     def forward(self,input,h,c):
-        first_dim=input.shape[0]
-        second_dim=input.shape[1]
-        input=input.view(input.shape[0]*input.shape[1],5,120,120)
-       # CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_(),requires_grad=True) # то есть первый параметр это seq_len; второй выход CNN
-        cnn = CNN()
-        cnn = nn.DataParallel(cnn)
-        CNN_out=cnn(input)
-        #CNN_out=self.CNN(input)
-        CNN_out=CNN_out.view(second_dim,first_dim,512)# меняем местами first и second, так как в lstm первая это seq_len, вторая - batch
-        return self.RNN(load_to_cuda(CNN_out),h,c)
+#        first_dim=input.shape[0]
+#        second_dim=input.shape[1]
+#        input=input.view(input.shape[0]*input.shape[1],5,120,120)
+#       # CNN_out=Variable(torch.FloatTensor(input.shape[0],512).zero_(),requires_grad=True) # то есть первый параметр это seq_len; второй выход CNN
+#        cnn = CNN()
+#        cnn = nn.DataParallel(cnn)
+#        CNN_out=cnn(input)
+#        #CNN_out=self.CNN(input)
+#        CNN_out=CNN_out.view(second_dim,first_dim,512)# меняем местами first и second, так как в lstm первая это seq_len, вторая - batch
+        return self.RNN(load_to_cuda(input),h,c)
 
     #        out = self.CNN(input)
     #        print("finish CNN:", out.shape)
