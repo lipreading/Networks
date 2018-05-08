@@ -20,10 +20,9 @@ from config import TRAINED_MODEL_PATH
 #    plt.show()
 
 
-def save_model(encoder, decoder,cnn):
+def save_model(encoder, decoder):
     torch.save(encoder.state_dict(), os.path.join(TRAINED_MODEL_PATH, 'encoder'))
     torch.save(decoder.state_dict(), os.path.join(TRAINED_MODEL_PATH, 'decoder'))
-    torch.save(cnn.state_dict(), os.path.join(TRAINED_MODEL_PATH, 'cnn'))
 
 #%%
 #with open('trainEpochLoss.txt') as f:
