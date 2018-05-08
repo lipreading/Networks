@@ -9,16 +9,18 @@ from torch.autograd import Variable
 import time
 import math
 import torch
+from tensorboardX import SummaryWriter
 
-from LipReading import EncoderRNN, DecoderRNN, CNN()
+from LipReading import EncoderRNN, DecoderRNN, CNN
 from config import *
 from data_loader import get_loader
 from utilities import save_model, load_to_cuda
 from alphabet import Alphabet
 import time
 
+writer = SummaryWriter(log_dir='tensorboard_logs')  # tensorboard logging tool
+
 def completeNull(v,v_size,out_size):#v_size - размерность вектора, out_size - необходимая размерность
-    alphabet=Alphabet()
     newv = Variable(load_to_cuda(torch.LongTensor(out_size).zero_()))
     for i in range(v_size):
          newv[i]=v[i].clone()
@@ -44,63 +46,40 @@ def get_word(seq): # seq-числа
         s+=alphabet.index2ch(el)
     return s
 def train(frames, targets, encoder, decoder, cnn, encoder_optimizer, decoder_optimizer,cnn_optimizer, criterion,teacher_force):
-
-    #encoder_hidden = encoder.initHidden()
-
+    
     frames = frames.float()
     frames, targets = to_var(frames),to_var(targets)
-    encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
     cnn_optimizer.zero_grad()
-    # input_length = frames.size()[0]
-    # target_length = targets_for_training.size()[0]
-    #print("frames",frames.shape)
-    #cnn_out = cnn(frames)
-    h0 = load_to_cuda(Variable(torch.zeros(3, BATCH_SIZE, encoder.hidden_size)))
-    c0 = load_to_cuda(Variable(torch.zeros(3, BATCH_SIZE, encoder.hidden_size)))
-       
-    encoder_output, encoder_hidden = encoder(cnn(frames),h0,c0)
-    encoder_output = torch.squeeze(encoder_output,1)
-    #print(encoder_hidden[0].shape)
-    decoder_output = decoder(targets, encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
-    
+    encoder_output, encoder_hidden = cnn(frames)
+    encoder_hidden[0]= encoder_hidden[0].view(encoder_hidden[0].shape[1],encoder_hidden[0].shape[0],-1)
+    encoder_hidden[1]= encoder_hidden[1].view(encoder_hidden[1].shape[1],encoder_hidden[1].shape[0],-1)
+    encoder_output=encoder_output.view(encoder_output.shape[1],encoder_output.shape[0],-1)
+    decoder_output = decoder(targets.view(targets.shape[1],targets.shape[0]), encoder_hidden[0],encoder_hidden[1],encoder_output,teacher_force)
     decoder_output = load_to_cuda(torch.squeeze(decoder_output,1))
-#    print(targets.shape)
-#    targets = torch.squeeze(targets,1)
-    #print(targets)
     targets=targets[:,1:]# убираем sos
 
-    #print("Len",targets.shape,decoder_output.shape)
     loss = get_loss(load_to_cuda(torch.t(decoder_output)), load_to_cuda(targets),criterion)
    
-    # print(loss.data[0])
     loss.backward()
     encoder_optimizer.step()
     decoder_optimizer.step()
     cnn_optimizer.step()
     return loss.data[0]
 
-#def get_loss(decoder_output,targets, citerion):
-#    if len(targets)==len(decoder_output):
-#        return criterion(decoder_output,targets)
-#    else:
-#        if len(targets)<len(decoder_output):
-#           compTarg =completeNull(targets,len(targets),len(decoder_output)).clone()
-#           return criterion(decoder_output,compTarg)
-#        else:
-#            assert False,"len target > len decoder_output"
 
 def get_loss(decoder_output,targets, criterion):
     #print('start get_loss')
     decoder_output=decoder_output.contiguous().view(decoder_output.shape[0]*decoder_output.shape[1],-1)
     targets=targets.contiguous().view(targets.shape[0]*targets.shape[1])
-    if len(targets)==len(decoder_output):
-       # print('keka')
-        return criterion(decoder_output,targets)
-    coef = abs(len(targets) - len(decoder_output)) + 1
-    if len(targets)<len(decoder_output):
-           return coef*criterion(decoder_output[:len(targets)],targets)  
-    return coef*criterion(decoder_output,targets[:len(decoder_output)])        
+    return criterion(decoder_output,targets)
+#    if len(targets)==len(decoder_output):
+#       # print('keka')
+#        return criterion(decoder_output,targets)
+#    coef = abs(len(targets) - len(decoder_output)) + 1
+#    if len(targets)<len(decoder_output):
+#           return coef*criterion(decoder_output[:len(targets)],targets)  
+#    return coef*criterion(decoder_output,targets[:len(decoder_output)])        
 
 def train_iters(encoder, decoder, cnn, num_epochs=NUM_EPOCHS,
                 print_every=10, plot_every=10, learning_rate=LEARNING_RATE):
@@ -110,8 +89,8 @@ def train_iters(encoder, decoder, cnn, num_epochs=NUM_EPOCHS,
     print('====================================================================')
     start = time.time()
     plot_losses = []
-    print_loss_total = 0
-    plot_loss_total = 0
+    total_train_loss = 0
+    plot_total_train_loss = 0
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
@@ -155,33 +134,33 @@ def train_iters(encoder, decoder, cnn, num_epochs=NUM_EPOCHS,
                 if epoch<=200:
                     teacher_force=0.15
                 else:
-                    teacher_force=0.3                        
+                    teacher_force=0.3
+            if count_words%200==0:
+                print("finish words:",count_words*BATCH_SIZE)                        
             loss = train(frames, targets, encoder, decoder, cnn, encoder_optimizer, decoder_optimizer, cnn_optimizer, criterion,teacher_force)
-           # print("finished words:",i+1)
-           #print("train_loss",loss)
-           # print("tot",total_test_loss)
-            with open('log2/trainLoss.txt', 'a') as f:
-                     s = 'epoch=' + str(epoch) +' i=' + str(i) + 'train_loss=' +str(loss)+'\n'                     
-                     f.write(s) 
-            print_loss_total += loss
-            plot_loss_total += loss
+            total_train_loss += loss
+            plot_total_train_loss += loss
             count_words+=1
         
-        with open('log2/trainLoss.txt', 'a') as f:
-                     s = 'finish epoch=' + str(epoch) + 'train_loss=' +str(print_loss_total)+'\n'
-                     f.write(s)
+        writer.add_scalar('trainLoss', total_train_loss, epoch)
+
         with open('log2/totalTrain.txt', 'a') as f:
-                     f.write(str(print_loss_total)+'\n')
+                     f.write(str(total_train_loss)+'\n')
         with open('log2/totalTest.txt', 'a') as f:
                      f.write(str(total_test_loss)+'\n')
 
 
-        print('iteration: {}, loss: {}'.format(epoch, print_loss_total))
-        print_loss_total = 0
+        print('iteration: {}, loss: {}'.format(epoch, total_train_loss))
+        total_train_loss = 0
         print("--- %s seconds ---" % (time.time() - start_time))
-        print("count_words:",count_words)
-      #  plot_losses.append(plot_loss_total/words_amount)
-       # plot_loss_total = 0
+        print("count_words:",count_words*BATCH_SIZE)
+        
+    # TODO: для testLoss в tensorboard вставить в нужное место эту строчку:
+    # writer.add_scalar('testLoss', loss, epoch)
+
+
+      #  plot_losses.append(plot_total_train_loss/words_amount)
+       # plot_total_train_loss = 0
         #
         # frames_batch = []  # очищаем батч
         # targets_batch = []
@@ -203,7 +182,6 @@ def train_iters(encoder, decoder, cnn, num_epochs=NUM_EPOCHS,
 
 def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion):
 
-   # encoder_hidden = encoder.initHidden()
     h0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
     c0 = load_to_cuda(Variable(torch.zeros(3, 1, encoder.hidden_size)))
 
@@ -237,7 +215,8 @@ def evaluate(frames,targets, encoder, decoder, encoder_optimizer, decoder_optimi
     return loss.data[0]
 
 
-try:
+#try:
+def calculate():
     if cuda.is_available():
         print('cuda is available!')
 
@@ -246,16 +225,19 @@ try:
     encoder=EncoderRNN()
    # encoder =nn.DataParallel(encoder)
     decoder = DecoderRNN()
-    cnn=CNN()
     if cuda.is_available():
         encoder.cuda()
         decoder.cuda()
-        cnn.cuda()
-        cnn = nn.DataParallell(cnn)
-    train_iters(encoder, decoder,cnn)
+        encoder = nn.DataParallel(encoder)
+        #encoder=nn.DataParallel(encoder)
+#        decoder=nn.DataParallel(decoder,dim=1)
+    train_iters(encoder, decoder)
 
-    save_model(encoder, decoder,cnn)
-except Exception as e:  # если вдруг произошла какя-то ошибка при обучении, сохраняем модель
-   print(e)
-   save_model(encoder, decoder,cnn)
-
+    save_model(encoder, decoder)
+    
+    writer.export_scalars_to_json("./all_scalars.json")
+    writer.close()
+#except Exception as e:  # если вдруг произошла какя-то ошибка при обучении, сохраняем модель
+#   print(e)
+#   save_model(encoder, decoder,cnn)
+calculate()

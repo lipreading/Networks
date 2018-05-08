@@ -98,7 +98,7 @@ class Alphabet:
             44:'7', 
             45:'8', 
             46:'9',
-            47:'null'}# для выравнивания deocer_ouput и target}
+            'null':47}# для выравнивания deocer_ouput и target
         
         self.length = 48
 

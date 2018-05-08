@@ -106,8 +106,8 @@ def collate_fn(data):
 def get_loader(frame_dir):
 
     lips_dataset = LipsDataset(frame_dir)
-    data_loader = torch.utils.data.DataLoader(dataset=lips_dataset, num_workers=4,
-                                              collate_fn=collate_fn, batch_size=BATCH_SIZE)
+    data_loader = torch.utils.data.DataLoader(dataset=lips_dataset, num_workers=12,
+                                              collate_fn=collate_fn, batch_size=BATCH_SIZE,drop_last=True)
     # print(data_loader)
     return data_loader
 
