@@ -2,7 +2,7 @@
 class Alphabet:
     def __init__(self):
         self.alph_dict = {
-            'а': 0,
+            'null': 0,
             'б': 1,
             'в': 2,
             'г': 3,
@@ -49,9 +49,9 @@ class Alphabet:
             '7':44, 
             '8':45, 
             '9':46,
-            'null':47}# для выравнивания deocer_ouput и target
+            'а':47}# для выравнивания deocer_ouput и target
         self.inv_alph_dict = {
-            0: 'а',
+            0: 'null',
             1: 'б',
             2: 'в',
             3: 'г',
@@ -98,7 +98,7 @@ class Alphabet:
             44:'7', 
             45:'8', 
             46:'9',
-            'null':47}# для выравнивания deocer_ouput и target
+            47:'а'}# для выравнивания deocer_ouput и target
         
         self.length = 48
 

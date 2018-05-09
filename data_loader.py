@@ -111,6 +111,15 @@ def get_loader(frame_dir):
     # print(data_loader)
     return data_loader
 
+def get_loader_evaluate(frame_dir):
+
+    lips_dataset = LipsDataset(frame_dir)
+    data_loader = torch.utils.data.DataLoader(dataset=lips_dataset, num_workers=4)
+    # print(data_loader)
+    return data_loader
+
+
+
 
 def make_batches(data_tensor, COUNT_FRAMES=COUNT_FRAMES):
     new_size = data_tensor.shape[0] - COUNT_FRAMES + 1

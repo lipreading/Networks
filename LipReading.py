@@ -26,7 +26,7 @@ def get_word(seq): # seq-числаf
 
 class EncoderRNN(nn.Module):
     def __init__(self):
-        super(CNN, self).__init__()
+        super(EncoderRNN, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=5, out_channels=96, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
         self.conv2 = nn.Conv2d(in_channels=96, out_channels=256, kernel_size=(3, 3), padding=1, stride=(2, 2))
         self.conv3 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(3, 3), padding=1)
@@ -111,21 +111,19 @@ class DecoderRNN(nn.Module):
         self.MLP_fc3=nn.Linear(self.MLP_hidden_size,48)
         
     def forward(self,Y,h,c, outEncoder,teacher_force):# Y это кол-во символов умножить на 256
-        print("Y",Y)
         if (np.random.rand()>teacher_force):
             seq_len=Y.shape[0]-1
             output_decoder= load_to_cuda(torch.autograd.Variable(torch.zeros(seq_len, h.shape[1], 48)))
             Y = self.embedding(Y)
             for  i in range(len(Y)-1): # -1 так как sos не учитывем в criterion
-                print("clone")
                 h[0],c[0] = self.lstm1(Y[i],(h[0].clone(),c[0].clone()))
                 h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
                 h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
-                context = self.attention(h[2].clone(), outEncoder)
-                context = load_to_cuda( torch.bmm( context,outEncoder.view(outEncoder.shape[1],outEncoder.shape[0],-1) ) )
-                print("context",context) # torch sueeze
-                cat =torch.cat( (h[2].clone(),context) ,1 )
-                output_decoder[i] = self.MLP(cat)    
+                h2=h[2].clone()
+                context = self.attention(h2, outEncoder,BATCH_SIZE)
+                context =  torch.bmm( context,outEncoder.view(outEncoder.shape[1],outEncoder.shape[0],-1) )
+               # print("context",context.shape) # torch sueeze
+                output_decoder[i] = self.MLP(torch.cat( (h2,torch.squeeze(context,1)) ,1 ))    
         else:
             seq_len=Y.shape[0]-1
             output_decoder= load_to_cuda(torch.autograd.Variable(torch.zeros(seq_len, h.shape[1], 48)))
@@ -136,31 +134,38 @@ class DecoderRNN(nn.Module):
                 h[0],c[0] = self.lstm1(Y_cur,(h[0].clone(),c[0].clone()))
                 h[1],c[1] = self.lstm2(h[0].clone(),(h[1].clone(),c[1].clone()))
                 h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
-                context = self.attention(h[2].clone(), outEncoder)
-                context = load_to_cuda( torch.bmm( context,outEncoder.view(outEncoder.shape[1],outEncoder.shape[0],-1) ) )
-                char = self.MLP( torch.cat( (h[2].clone(),context),1 ) )
-                output_decoder[i] = char.clone()
-                print("output decoder",output_decoder.shape)
+                h2 = h[2].clone()
+                context = self.attention(h2, outEncoder,BATCH_SIZE)
+                context = torch.bmm( context,outEncoder.view(outEncoder.shape[1],outEncoder.shape[0],-1) )
+                output_decoder[i]  =  self.MLP(torch.cat( (h2,torch.squeeze(context,1)) ,1 ))
                 argmax = torch.max(output_decoder[i][0],dim=0)
                 Y_cur=self.embedding( Variable(load_to_cuda(torch.LongTensor([argmax[1][0].data[0]]))) ).view(1,self.hidden_size)
-        return output_decoder[:seq_len] 
+        return output_decoder 
         
         
-    def evaluate(self,h0,c0,outEncoder): # sos в return быть не должно
-        h = load_to_cuda(torch.squeeze(h0.clone(),0))
-        c = load_to_cuda(torch.squeeze(c0.clone(),0))
-        seq_len = 50# максимальная длина
+    def evaluate(self,h,c,outEncoder,max_len=-1): # sos в return быть не должно
+     #   h = load_to_cuda(torch.squeeze(h0.clone(),0))
+     #   c = load_to_cuda(torch.squeeze(c0.clone(),0))
+        h = h.view(h.shape[1],h.shape[0],-1).clone()
+        c = c.view(c.shape[1],c.shape[0],-1).clone()
+        if max_len==-1:
+            seq_len = 50# максимальная длина
+        else:
+            seq_len=max_len
         result = load_to_cuda(torch.FloatTensor(seq_len,1,48).zero_())
+        if (len(outEncoder.shape))!=3:
+            print("размерность encoderOut неправильная")
+            return result, result[0], False
         alphabet = Alphabet()
         listArgmax=[]# буквы, которые выдал
-        Y_cur = self.embedding( Variable(load_to_cuda(torch.LongTensor([alphabet.ch2index('<sos>')]))) ).view(1,self.hidden_size)
+        Y_cur = self.embedding( load_to_cuda(Variable(torch.LongTensor([alphabet.ch2index('<sos>')]))) ).view(1,self.hidden_size)
         for  i in range(seq_len-1):
-            h[0],c[0] = self.lstm1(Y_cur,(h[0],c[0]))
-            h[1],c[1] = self.lstm2(h[0],(h[1],c[1]))
-            h[2],c[2] = self.lstm3(h[1],(h[2],c[2]))
-            context = self.attention(h[2], outEncoder)
-            context = torch.mm(context,outEncoder)
-            char = self.MLP( torch.cat( (h[2],context),1 ) )
+            h[0],c[0] = self.lstm1(Y_cur,(h[0].clone(),c[0].clone()))
+            h[1],c[1] = self.lstm2(h[0],(h[1].clone(),c[1].clone()))
+            h[2],c[2] = self.lstm3(h[1].clone(),(h[2].clone(),c[2].clone()))
+            context = self.attention(h[2].clone(), outEncoder.view(outEncoder.shape[1],outEncoder.shape[0],-1),1)
+            context = torch.bmm(context,outEncoder)         
+            char = self.MLP( torch.cat( (h[2].clone(),context.view(1,self.hidden_size)),1 ) )
             result[i] = char.data
             argmax = torch.max(result[i][0],dim=0)
             listArgmax.append(argmax[1][0])
@@ -170,10 +175,11 @@ class DecoderRNN(nn.Module):
             Y_cur=self.embedding( Variable(load_to_cuda(torch.LongTensor([argmax[1][0]]))) ).view(1,self.hidden_size)
 
         word=get_word(torch.LongTensor(listArgmax))
-        print("res:",word)
-        with open('log2/result.txt', 'a') as f:
-                 f.write("res:"+word+'\n')
-        return result[:seq_len]        
+ #       print("res:",word)
+     #   with open('log2/result.txt', 'a') as f:
+     #            f.write("res:"+word+'\n')
+     #            print("res:",word)
+        return result[:seq_len],word, True        
  
     
     def MLP(self,v):
@@ -181,14 +187,15 @@ class DecoderRNN(nn.Module):
         v = F.relu(self.MLP_fc2(v))
         v = self.MLP_fc3(v)
         return v 
-    def attention(self,hidden, outEncoder):# то есть hidden это 1*1*256; outEncoder это 10*1*256, если batch_size=1        
-        outEnSize= outEncoder.shape[0]
-        hidden= hidden.expand(outEnSize,-1,-1)
-        hidden=hidden.contiguous().view(hidden.shape[1],self.hidden_size,hidden.shape[0])
-        WS = torch.bmm(self.att_W.expand(BATCH_SIZE,-1,-1),hidden)
-        VOut = torch.bmm(self.att_V.expand(BATCH_SIZE,-1,-1),outEncoder.view(BATCH_SIZE,self.hidden_size,outEnSize))
-        E = F.tanh(WS + VOut + self.att_b.expand(BATCH_SIZE,-1,outEnSize))
-        E = torch.bmm(self.att_vector.expand(BATCH_SIZE,-1,-1),E)
-        print("E",E.shape)
+    def attention(self,hidden, outEncoder,batch):# то есть hidden это 1*1*256; outEncoder это 10*1*256, если batch_size=1        
+        outEnSize = outEncoder.shape[0]
+        hidden =hidden.view(hidden.shape[0],self.hidden_size,1)
+        hidden= hidden.expand(-1,-1,outEnSize)
+     #   hidden=hidden.contiguous().view(hidden.shape[1],self.hidden_size,hidden.shape[0])
+       # print(hidden.shape)
+        WS = torch.bmm(self.att_W.expand(batch,-1,-1),hidden)
+        VOut = torch.bmm(self.att_V.expand(batch,-1,-1),outEncoder.view(batch,self.hidden_size,outEnSize))
+        E = F.tanh(WS + VOut + self.att_b.expand(batch,-1,outEnSize))
+        E = torch.bmm(self.att_vector.expand(batch,-1,-1),E)
         return F.softmax(E, dim=2)          
 

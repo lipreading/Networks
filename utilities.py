@@ -21,8 +21,8 @@ from config import TRAINED_MODEL_PATH
 
 
 def save_model(encoder, decoder):
-    torch.save(encoder.state_dict(), os.path.join(TRAINED_MODEL_PATH, 'encoder'))
-    torch.save(decoder.state_dict(), os.path.join(TRAINED_MODEL_PATH, 'decoder'))
+    torch.save(encoder, os.path.join(TRAINED_MODEL_PATH, 'encoder'))
+    torch.save(decoder, os.path.join(TRAINED_MODEL_PATH, 'decoder'))
 
 #%%
 #with open('trainEpochLoss.txt') as f:
